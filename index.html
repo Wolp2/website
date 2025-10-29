@@ -1,35 +1,97 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-   <meta charset="UTF-8">
-   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-   <title>ATL Migo</title>
-   <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ATL Migo</title>
+  <link rel="stylesheet" href="style.css" />
+
+  <style>
+    /* --- Page styling tweaks --- */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    header img {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 3px solid white;
+      box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    }
+
+    main {
+      padding: 20px;
+      text-align: center;
+    }
+
+    /* --- About section background --- */
+    .about-section {
+      position: relative;
+      background-image: url('images/cuh_house.jpg');
+      background-size: cover;
+      background-position: center center;
+      background-repeat: no-repeat;
+      height: 85vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      text-align: center;
+      overflow: hidden;
+    }
+
+    .about-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.4);
+    }
+
+    .about-content {
+      position: relative;
+      z-index: 1;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+  </style>
 </head>
 <body>
 
-   <header>
+  <header>
+    <img src="images/headshot.jpg" alt="William Lopez Headshot">
+    <div>
       <h1>Welcome to My Website</h1>
-      <p>This is a personal project to help me learn web development and journal my life</p>
-   </header>
+      <p>This is a personal project to help me learn web development and journal my life.</p>
+    </div>
+  </header>
 
-   <div id="navbar"></div>
+  <div id="navbar"></div>
 
-    <script>
-        fetch("nav.html")
-            .then(res => res.text())
-            .then(html => document.getElementById("navbar").innerHTML = html)
-            .catch(err => console.error("Failed to load nav:", err));
-    </script>
+  <script>
+    fetch("nav.html")
+      .then(res => res.text())
+      .then(html => document.getElementById("navbar").innerHTML = html)
+      .catch(err => console.error("Failed to load nav:", err));
+  </script>
 
-   <main>
-      <h2>About Me</h2>
-      <p>Hello friends, family and strangers! My name is William Lopez. I’m currently pursuing a degree in CS: Software Engineering. This is a website I created to reinforce my learnings.</p>
-   </main>
+  <main>
+    <section class="about-section">
+      <div class="about-overlay"></div>
+      <div class="about-content">
+        <h2>About Me</h2>
+        <p>Hello friends, family, and strangers! My name is William Lopez. I’m currently pursuing a degree in CS: Software Engineering. This website is a creative space where I track my progress, work on projects, and share personal moments.</p>
+      </div>
+    </section>
+  </main>
 
-   <footer>
-      <p>&copy; 2025 William Lopez. All rights reserved.</p>
-   </footer>
+  <footer>
+    <p>&copy; 2025 William Lopez. All rights reserved.</p>
+  </footer>
 
 </body>
 </html>
