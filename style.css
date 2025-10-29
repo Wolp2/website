@@ -1,0 +1,95 @@
+/* ===== Global Styles ===== */
+body {
+   font-family: Arial, sans-serif;
+   margin: 0;
+   padding: 0;
+   background-color: #f4f4f4;
+}
+
+/* ===== Header ===== */
+header {
+   background-color: #333;
+   color: white;
+   padding: 20px;
+   text-align: center;
+}
+
+/* ===== Navigation ===== */
+nav {
+   background-color: #555;
+   padding: 10px;
+   text-align: center;
+}
+
+nav a {
+   color: white;
+   text-decoration: none;
+   margin: 10px;
+   font-weight: bold;
+}
+
+nav a:hover {
+   text-decoration: underline;
+}
+
+/* ===== Main Content ===== */
+main {
+   padding: 20px;
+}
+
+/* ===== Footer ===== */
+footer {
+   text-align: center;
+   background-color: #333;
+   color: white;
+   padding: 10px;
+   position: fixed;
+   bottom: 0;
+   width: 100%;
+}
+
+/* ==== Lightbox overlay ====*/
+.lightbox {
+  position: fixed;
+  inset: 0;
+  display: none;            /* hidden by default */
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,.8);
+  z-index: 1000;
+  padding: 20px;
+}
+.lightbox.open { display: flex; }
+
+.lightbox-content {
+  max-width: 90vw;
+  max-height: 90vh;
+  display: grid;
+  grid-template-rows: auto auto;
+  gap: 10px;
+}
+.lightbox-img {
+  max-width: 90vw;
+  max-height: 80vh;
+  object-fit: contain;
+  border-radius: 8px;
+  background: #111;
+}
+.lightbox-caption {
+  color: #eee;
+  text-align: center;
+  font-size: .95rem;
+}
+
+.lightbox-close {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 28px;
+  cursor: pointer;
+  line-height: 1;
+}
+.lightbox-close:hover { opacity: .8; }

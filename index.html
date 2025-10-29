@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>ATL Migo</title>
+   <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+   <header>
+      <h1>Welcome to My Website</h1>
+      <p>This is a personal project to help me learn web development and journal my life</p>
+   </header>
+
+   <div id="navbar"></div>
+
+    <script>
+        fetch("nav.html")
+            .then(res => res.text())
+            .then(html => document.getElementById("navbar").innerHTML = html)
+            .catch(err => console.error("Failed to load nav:", err));
+    </script>
+
+   <main>
+      <h2>About Me</h2>
+      <p>Hello friends, family and strangers! My name is William Lopez. I’m currently pursuing a degree in CS: Software Engineering. This is a website I created to reinforce my learnings.</p>
+   </main>
+
+   <footer>
+      <p>&copy; 2025 William Lopez. All rights reserved.</p>
+   </footer>
+
+</body>
+</html>
