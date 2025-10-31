@@ -1,6 +1,7 @@
+// Fitness.jsx
 import { useEffect, useMemo, useState } from "react";
 
-/** ======= Published CSV URL here ======= */
+/** ======= Published CSV URL here (yours) ======= */
 const SHEET_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vQZlEe5gpor6F0j6tRvsPrYhdrjOENGut0jUPdqTtyNYdefmRO72v1ogD9rLcUHN1HIJbMzkSfVNmRE/pub?gid=0&single=true&output=csv";
 
@@ -11,392 +12,343 @@ function parseMDY(str) {
   const m = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/.exec(trim(str));
   if (!m) return null;
   let [, mm, dd, yy] = m.map(Number);
-  if (yy < 100) yy += 2000;
+  if (yy < 100) yy += yy >= 70 ? 1900 : 2000;
   return new Date(yy, mm - 1, dd);
 }
 
-function inferCategory(exercise) {
-  const e = (exercise || "").toLowerCase();
-  if (/(bench|shoulder|tricep|overhead|dip|push)/.test(e)) return "Push";
-  if (/(row|pullup|curl|lat|bicep|hamstring|deadlift)/.test(e)) return "Pull";
-  if (/(squat|leg|calf|lunge)/.test(e)) return "Legs";
-  if (/(run|cardio|bike|treadmill|mile)/.test(e)) return "Cardio";
-  return "Other";
+function formatDate(d) {
+  try {
+    return d.toLocaleDateString(undefined, {
+      month: "2-digit",
+      day: "2-digit",
+      year: "numeric",
+    });
+  } catch {
+    return "";
+  }
 }
 
-/** Quote-aware CSV parser (handles commas inside quotes) */
+// tiny CSV parser that handles quoted commas/newlines
 function parseCSV(text) {
-  const lines = text.replace(/\r\n?/g, "\n").split("\n");
   const rows = [];
+  let i = 0,
+    cur = "",
+    row = [],
+    inQ = false;
 
-  for (const raw of lines) {
-    if (raw === "") continue;
-    const out = [];
-    let cur = "";
-    let inQuotes = false;
+  while (i < text.length) {
+    const ch = text[i];
 
-    for (let i = 0; i < raw.length; i++) {
-      const ch = raw[i];
+    if (inQ) {
       if (ch === '"') {
-        if (inQuotes && raw[i + 1] === '"') {
-          cur += '"'; // escaped quote
-          i++;
+        if (text[i + 1] === '"') {
+          cur += '"';
+          i += 2;
         } else {
-          inQuotes = !inQuotes;
+          inQ = false;
+          i++;
         }
-      } else if (ch === "," && !inQuotes) {
-        out.push(cur.trim());
-        cur = "";
       } else {
         cur += ch;
+        i++;
+      }
+    } else {
+      if (ch === '"') {
+        inQ = true;
+        i++;
+      } else if (ch === ",") {
+        row.push(cur);
+        cur = "";
+        i++;
+      } else if (ch === "\n") {
+        row.push(cur);
+        rows.push(row);
+        row = [];
+        cur = "";
+        i++;
+      } else if (ch === "\r") {
+        // normalize \r\n
+        i++;
+      } else {
+        cur += ch;
+        i++;
       }
     }
-    out.push(cur.trim());
-    rows.push(out);
+  }
+  // last cell
+  row.push(cur);
+  rows.push(row);
+  // drop empty trailing row
+  if (rows.length && rows[rows.length - 1].every((c) => trim(c) === "")) {
+    rows.pop();
   }
   return rows;
 }
 
-function catClass(cat) {
-  const c = (cat || "").toLowerCase();
-  if (c === "push") return "cat-push";
-  if (c === "pull") return "cat-pull";
-  if (c === "legs") return "cat-legs";
-  if (c === "cardio") return "cat-cardio";
-  return "cat-other";
+function indexByName(headers, nameCandidates) {
+  const target = headers.map((h) => trim(h).toLowerCase());
+  for (const name of nameCandidates) {
+    const i = target.indexOf(name.toLowerCase());
+    if (i !== -1) return i;
+  }
+  return -1;
 }
 
-/** Count sets from a reps string like "10/10/10-8" */
-function inferSetsFromReps(repsStr) {
-  if (!repsStr) return "";
-  const normalized = String(repsStr).replace(/-/g, "/").replace(/\s+/g, "");
-  return normalized.split("/").filter(Boolean).length || "";
-}
-
-/** Cardio detector used for tables and mileage */
-function isCardio(item) {
-  const c = (item?.category || "").toLowerCase();
-  const ex = (item?.exercise || "");
-  return (
-    c.includes("cardio") ||
-    /run|treadmill|bike|cycling/i.test(ex) ||
-    !!item?.distance ||
-    !!item?.duration
-  );
-}
-
-/** Summarize the day's run (distance/duration/notes) once per day */
-function getRunSummary(day) {
-  if (!day?.items?.length) return null;
-  const runs = day.items.filter(isCardio);
-  if (!runs.length) return null;
-
-  const totalMiles = runs.reduce((s, it) => s + (parseFloat(it.distance) || 0), 0);
-  const totalMins = runs.reduce((s, it) => s + (parseFloat(it.duration) || 0), 0);
-  const notes = [...new Set(runs.map((r) => r.notes).filter(Boolean))].join(" · ");
-
-  return {
-    miles: totalMiles ? Math.round(totalMiles * 100) / 100 : null,
-    mins: totalMins || null,
-    notes,
-  };
-}
-
-/* ========= Page ========= */
+/* ========= Component ========= */
 export default function Fitness() {
-  const [days, setDays] = useState(null);
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
   useEffect(() => {
-    let cancelled = false;
-
-    fetch(SHEET_URL, { cache: "no-store" })
-      .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.text();
-      })
-      .then((csv) => {
-        if (cancelled) return;
-        const rows = parseCSV(csv);
-        if (rows.length < 2) throw new Error("CSV has no data rows.");
-
-        // ---- Flexible header matching ----
-        const rawHeader = rows[0];
-        const norm = (s) => s.toLowerCase().replace(/\s+/g, "").replace(/[^\w]/g, "");
-        const header = rawHeader.map(norm);
-        const find = (...aliases) => {
-          for (const a of aliases.map(norm)) {
-            const ix = header.indexOf(a);
-            if (ix !== -1) return ix;
-          }
-          return -1;
-        };
-
-        const iDate  = find("date");
-        const iCat   = find("category");
-        const iEx    = find("exercise");
-        const iW     = find("weight");
-        const iSets  = find("sets");
-        const iReps  = find("reps", "repssets"); // allow legacy naming
-        const iRS    = find("repssets");         // explicit legacy column
-        const iD     = find("distance(mi)", "distance");
-        const iT     = find("duration(min)", "duration");
-        const iNotes = find("notes");
-
-        if (iDate === -1 || iEx === -1) {
-          throw new Error(`Missing required columns. Found: [${rows[0].join(", ")}]`);
-        }
-
-        let lastDate = "";
-        let lastCat = "";
-        const entries = [];
-
-        for (let i = 1; i < rows.length; i++) {
-          const r = rows[i];
-          if (!r.length || r.every((c) => !trim(c))) continue;
-
-          let d = trim(r[iDate]);
-          let c = iCat >= 0 ? trim(r[iCat]) : "";
-          const ex = trim(r[iEx]);
-
-          const weight = iW >= 0 ? trim(r[iW]) : "";
-          let reps = iReps >= 0 ? trim(r[iReps]) : "";
-          if (!reps && iRS >= 0) reps = trim(r[iRS]); // legacy
-          let sets = iSets >= 0 ? trim(r[iSets]) : "";
-          if (!sets && reps) sets = inferSetsFromReps(reps);
-
-          const dist = iD >= 0 ? trim(r[iD]) : "";
-          const dur = iT >= 0 ? trim(r[iT]) : "";
-          const notes = iNotes >= 0 ? trim(r[iNotes]) : "";
-
-          if (d) lastDate = d;
-          else d = lastDate;
-
-          if (c) lastCat = c;
-          else c = lastCat || inferCategory(ex);
-
-          if (!d || !ex) continue;
-
-          entries.push({
-            dateStr: d,
-            dateObj: parseMDY(d) || new Date(d),
-            category: c,
-            exercise: ex,
-            weight,
-            sets,
-            reps,
-            distance: dist,
-            duration: dur,
-            notes,
-          });
-        }
-
-        // group by date
-        const byDate = {};
-        entries.forEach((e) => {
-          const key = e.dateStr;
-          if (!byDate[key]) {
-            byDate[key] = {
-              dateStr: key,
-              dateObj: e.dateObj,
-              category: e.category,
-              items: [],
-            };
-          }
-          if (!byDate[key].category && e.category) byDate[key].category = e.category;
-          byDate[key].items.push(e);
-        });
-
-        const daysSorted = Object.values(byDate).sort(
-          (a, b) => b.dateObj - a.dateObj
-        );
-        setDays(daysSorted);
-      })
-      .catch((e) => {
+    let alive = true;
+    (async () => {
+      setLoading(true);
+      setErr("");
+      try {
+        const res = await fetch(SHEET_URL, { cache: "no-store" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const csv = await res.text();
+        const parsed = parseCSV(csv);
+        if (!alive) return;
+        setRows(parsed);
+      } catch (e) {
+        if (!alive) return;
+        setErr("Could not load training log.");
         console.error(e);
-        if (!cancelled) setErr(e.message || "Failed to load sheet.");
-      });
-
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
     return () => {
-      cancelled = true;
+      alive = false;
     };
   }, []);
 
-  // Weekly mileage (last 7 days) — cardio only
-  const last7dMiles = useMemo(() => {
-    if (!days) return 0;
-    const now = new Date();
-    const weekAgo = new Date(now);
-    weekAgo.setDate(now.getDate() - 7);
-    let total = 0;
-    days.forEach((d) => {
-      if (d.dateObj >= weekAgo) {
-        d.items.forEach((it) => {
-          if (!isCardio(it)) return;
-          const miles = parseFloat(it.distance);
-          if (!isNaN(miles)) total += miles;
-        });
-      }
-    });
-    return Math.round(total * 100) / 100;
-  }, [days]);
+  const data = useMemo(() => {
+    if (!rows.length) return { latestDate: null, tag: "", items: [] };
+    const headers = rows[0];
+    const body = rows.slice(1);
+
+    // Map columns by common header names (case-insensitive, flexible)
+    const colDate = indexByName(headers, ["date", "workout date", "day"]);
+    const colTag = indexByName(headers, ["tag", "focus", "split", "bodypart", "type"]);
+    const colExercise = indexByName(headers, ["exercise", "movement"]);
+    const colSets = indexByName(headers, ["sets"]);
+    const colReps = indexByName(headers, ["reps"]);
+    const colWeight = indexByName(headers, ["weight", "load", "lbs"]);
+
+    // Normalize rows
+    const normalized = body
+      .map((r) => ({
+        dateStr: trim(r[colDate] ?? ""),
+        date: parseMDY(r[colDate]),
+        tag: trim(r[colTag] ?? ""),
+        exercise: trim(r[colExercise] ?? ""),
+        sets: trim(r[colSets] ?? ""),
+        reps: trim(r[colReps] ?? ""),
+        weight: trim(r[colWeight] ?? ""),
+      }))
+      .filter((r) => r.exercise || r.reps || r.weight);
+
+    // Find latest date
+    const withDates = normalized.filter((r) => r.date instanceof Date && !isNaN(r.date));
+    if (!withDates.length) return { latestDate: null, tag: "", items: [] };
+    const latestDate = withDates.reduce((a, b) => (a.date > b.date ? a : b)).date;
+
+    // Use the first tag on that date (if any)
+    const dateKey = latestDate.toDateString();
+    const todays = withDates.filter((r) => r.date.toDateString() === dateKey);
+    const tag = todays.find((r) => r.tag)?.tag ?? "";
+
+    // Group by exercise (some sheets put blank rows for headings)
+    const items = todays
+      .filter((r) => r.exercise)
+      .map((r) => ({
+        exercise: r.exercise,
+        sets: r.sets || "-",
+        reps: r.reps || "-",
+        weight: r.weight ? `${r.weight}` : "-",
+      }));
+
+    return { latestDate, tag, items };
+  }, [rows]);
+
+  const dateLabel = data.latestDate ? formatDate(data.latestDate) : "";
 
   return (
-    <main style={{ maxWidth: 900, margin: "0 auto", padding: 20 }}>
-      <h1>My Training Log</h1>
-      <p className="muted">Live from Google Sheets — lifts + runs.</p>
+    <main className="fitness-wrap">
+      <section className="container">
+        <header className="page-head">
+          <h1>My Training Log</h1>
+          <p className="sub">Live from Google Sheets — lifts + runs.</p>
+        </header>
 
-      {err ? (
-        <div className="card" style={{ border: "2px solid #e35151" }}>
-          <p><strong>Couldn’t load the workout sheet.</strong> {err}</p>
-          <p>Checklist:<br/>
-            1) Use Vite dev server (<code>npm run dev</code>)<br/>
-            2) Publish your tab as CSV (URL has <code>gid=…&output=csv</code>)
-          </p>
+        <div className="panel">
+          <div className="panel-head">
+            <h2 className="panel-title">Latest Workout — {dateLabel || "—"}</h2>
+            {data.tag ? <span className="tag">{data.tag}</span> : null}
+          </div>
+
+          {loading && (
+            <div className="loading">Loading latest session…</div>
+          )}
+          {!!err && <div className="error">{err}</div>}
+
+          {!loading && !err && data.items.length === 0 && (
+            <div className="empty">No entries for the latest date.</div>
+          )}
+
+          <div className="workout-log">
+            {data.items.map((w, i) => (
+              <div key={i} className="exercise-card">
+                <div className="exercise-header">
+                  <h3>{w.exercise}</h3>
+                  <span className="weight">{w.weight}</span>
+                </div>
+                <div className="sets-reps">
+                  <p>
+                    <strong>Sets:</strong> {w.sets}
+                  </p>
+                  <p>
+                    <strong>Reps:</strong> {w.reps}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
-      ) : !days ? (
-        <div className="card"><p>Loading…</p></div>
-      ) : (
-        <>
-          <LatestCard day={days[0]} />
 
-          {/* Weekly mileage */}
-          <section
-            className="card"
-            style={{ marginTop: 16, display: "flex", gap: 12, alignItems: "center" }}
-          >
-            <span className="badge cat-cardio">Last 7 days</span>
-            <div><strong>{last7dMiles} miles</strong> logged in runs</div>
-          </section>
+        <footer className="site-foot">© {new Date().getFullYear()} William Lopez</footer>
+      </section>
 
-          <h2 style={{ marginTop: 28 }}>Workout History</h2>
-          <History days={days} />
-        </>
-      )}
-
-      {/* Inline styles for badges/cards/rows */}
+      {/* ---- Minimal, mobile-first CSS (scoped globally). 
+         If you prefer, move this to fitness.css and import it. ---- */}
       <style>{`
-        .badge { display:inline-block; padding:4px 10px; border-radius:999px; font-size:.85rem; font-weight:700; color:#fff; letter-spacing:.2px; }
-        .cat-push  { background:#e35151; }
-        .cat-pull  { background:#3b82f6; }
-        .cat-legs  { background:#10b981; }
-        .cat-cardio{ background:#8b5cf6; }
-        .cat-other { background:#6b7280; }
-
-        .card { background:#fff; border-radius:12px; padding:16px; margin:16px 0; box-shadow:0 6px 18px rgba(0,0,0,.08); }
-        .muted { color:#666; font-size:.9rem; }
-
-        .list { margin:10px 0 0; padding:0; list-style:none; }
-        .row {
-          display:grid;
-          grid-template-columns: 1fr 110px 70px 1fr; /* Exercise | Weight | Sets | Reps */
-          gap:10px;
-          padding:10px 0;
-          border-bottom:1px solid #eee;
-          align-items:center;
+        :root {
+          --bg: #f7f7fb;
+          --text: #111827;
+          --muted: #6b7280;
+          --card: #ffffff;
+          --line: #e5e7eb;
+          --accent: #16a34a;
+          --accent-2: #22c55e;
         }
-        .row:last-child { border-bottom:none; }
-        .hdr { font-weight:700; border-bottom:2px solid #ddd; }
-        .tag { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background:#f3f4f6; border-radius:6px; padding:2px 8px; text-align:center; }
-        .exercise { font-weight:600; }
-        @media (max-width:600px){ .row { grid-template-columns: 1fr 1fr; } }
+
+        .fitness-wrap {
+          background: var(--bg);
+          min-height: 100dvh;
+          color: var(--text);
+        }
+        .container {
+          max-width: 860px;
+          margin: 0 auto;
+          padding: 1rem clamp(1rem, 3vw, 1.25rem) 2.5rem;
+        }
+
+        .page-head h1 {
+          font-size: clamp(1.6rem, 3.5vw, 2.25rem);
+          margin: 0 0 .25rem 0;
+          font-weight: 800;
+          letter-spacing: -0.02em;
+        }
+        .sub {
+          margin: 0 0 1rem 0;
+          color: var(--muted);
+        }
+
+        .panel {
+          background: var(--card);
+          border: 1px solid #d1fae5;
+          border-radius: 16px;
+          padding: 0.9rem;
+          box-shadow: 0 2px 6px rgba(0,0,0,.04);
+        }
+        @media (min-width: 640px) {
+          .panel { padding: 1.2rem; }
+        }
+
+        .panel-head {
+          display: flex;
+          align-items: center;
+          gap: .6rem;
+          margin-bottom: .75rem;
+        }
+        .panel-title {
+          font-size: 1.1rem;
+          font-weight: 700;
+          margin: 0;
+        }
+
+        .tag {
+          background: linear-gradient(135deg, var(--accent-2), var(--accent));
+          color: #fff;
+          font-size: .8rem;
+          padding: .2rem .6rem;
+          border-radius: 999px;
+        }
+
+        .loading, .error, .empty {
+          padding: .8rem 1rem;
+          border-radius: 12px;
+          font-size: .95rem;
+          background: #f9fafb;
+          border: 1px solid var(--line);
+          margin-bottom: .75rem;
+        }
+        .error { border-color: #fecaca; background: #fff1f2; }
+
+        .workout-log {
+          display: flex;
+          flex-direction: column;
+          gap: .8rem;
+        }
+
+        .exercise-card {
+          background: #fff;
+          border: 1px solid var(--line);
+          border-radius: 14px;
+          padding: .9rem;
+        }
+        @media (min-width: 600px) {
+          .exercise-card { padding: 1.1rem 1.2rem; }
+        }
+
+        .exercise-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: baseline;
+          border-bottom: 1px solid #eee;
+          padding-bottom: .35rem;
+          margin-bottom: .45rem;
+          gap: .5rem;
+        }
+        .exercise-header h3 {
+          font-size: 1.05rem;
+          font-weight: 700;
+          margin: 0;
+        }
+        .weight {
+          background: #e6f6ee;
+          color: #256d40;
+          padding: .2rem .55rem;
+          border-radius: 8px;
+          font-size: .9rem;
+          white-space: nowrap;
+        }
+        .sets-reps p {
+          margin: .25rem 0;
+          font-size: .95rem;
+          line-height: 1.45;
+        }
+
+        .site-foot {
+          text-align: center;
+          color: var(--muted);
+          margin-top: 1.25rem;
+          font-size: .9rem;
+        }
       `}</style>
     </main>
-  );
-}
-
-/* ====== UI pieces ====== */
-
-function LatestCard({ day }) {
-  if (!day) return null;
-  const badge = <span className={`badge ${catClass(day.category)}`}>{day.category || "Other"}</span>;
-  const run = getRunSummary(day);
-
-  return (
-    <section className="card" style={{ border: "2px solid #10b981" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-        <h2 style={{ margin: 0 }}>Latest Workout — {day.dateStr}</h2>
-        {badge}
-      </div>
-
-      {run && (
-        <div className="run-summary" style={{
-          marginTop: 6, display: "inline-flex", gap: 8, alignItems: "center", flexWrap: "wrap"
-        }}>
-          <span className="badge cat-cardio">Run</span>
-          <span className="tag">{run.miles ?? "-"} mi</span>
-          <span className="tag">{run.mins ?? "-"} min</span>
-          {run.notes && <span className="tag" title={run.notes}>Notes: {run.notes}</span>}
-        </div>
-      )}
-
-      <ul className="list">
-        <HeaderRow />
-        {day.items.filter((it) => !isCardio(it)).map((it, i) => (
-          <Row key={i} item={it} />
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-function History({ days }) {
-  return (
-    <section>
-      {days.map((day) => {
-        const run = getRunSummary(day);
-        return (
-          <article className="card" key={day.dateStr + (day.items?.length || 0)}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <h3 style={{ margin: "0 0 6px" }}>{day.dateStr}</h3>
-              <span className={`badge ${catClass(day.category)}`}>{day.category || "Other"}</span>
-            </div>
-
-            {run && (
-              <div className="run-summary" style={{
-                marginTop: 6, display: "inline-flex", gap: 8, alignItems: "center", flexWrap: "wrap"
-              }}>
-                <span className="badge cat-cardio">Run</span>
-                <span className="tag">{run.miles ?? "-"} mi</span>
-                <span className="tag">{run.mins ?? "-"} min</span>
-                {run.notes && <span className="tag" title={run.notes}>Notes: {run.notes}</span>}
-              </div>
-            )}
-
-            <ul className="list">
-              <HeaderRow />
-              {day.items.filter((it) => !isCardio(it)).map((it, i) => (
-                <Row key={i} item={it} />
-              ))}
-            </ul>
-          </article>
-        );
-      })}
-    </section>
-  );
-}
-
-function HeaderRow() {
-  return (
-    <li className="row hdr">
-      <span className="exercise">Exercise</span>
-      <span className="tag">Weight</span>
-      <span className="tag">Sets</span>
-      <span className="tag">Reps</span>
-    </li>
-  );
-}
-
-function Row({ item }) {
-  const setsDisplay = item.sets || (item.reps ? inferSetsFromReps(item.reps) : "-");
-  const repsDisplay = item.reps || "-";
-
-  return (
-    <li className="row">
-      <span className="exercise">{item.exercise}</span>
-      <span className="tag">{item.weight || "-"}</span>
-      <span className="tag">{setsDisplay}</span>
-      <span className="tag">{repsDisplay}</span>
-    </li>
   );
 }
