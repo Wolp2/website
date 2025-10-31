@@ -25,11 +25,37 @@ function inferCategory(exercise) {
 }
 
 function parseCSV(text) {
-  // simple CSV splitter (no quotes support; good for this sheet)
-  return text
-    .trim()
-    .split(/\r?\n/)
-    .map((line) => line.split(",").map((cell) => cell.trim()));
+  const lines = text.replace(/\r\n?/g, "\n").split("\n");
+
+  const rows = [];
+  for (const raw of lines) {
+    if (!raw) continue;
+    const out = [];
+    let cur = "";
+    let inQuotes = false;
+
+    for (let i = 0; i < raw.length; i++) {
+      const ch = raw[i];
+
+      if (ch === '"') {
+        // Toggle quotes, unless it's an escaped quote ("")
+        if (inQuotes && raw[i + 1] === '"') {
+          cur += '"';
+          i++; // skip the escaped quote
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (ch === "," && !inQuotes) {
+        out.push(cur.trim());
+        cur = "";
+      } else {
+        cur += ch;
+      }
+    }
+    out.push(cur.trim());
+    rows.push(out);
+  }
+  return rows;
 }
 
 function catClass(cat) {
