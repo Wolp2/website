@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 const SHEET_URL =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQZlEe5gpor6F0j6tRvsPrYhdrjOENGut0jUPdqTtyNYdefmRO72v1ogD9rLcUHN1HIJbMzkSfVNmRE/pubhtml?gid=0&single=true";
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQZlEe5gpor6F0j6tRvsPrYhdrjOENGut0jUPdqTtyNYdefmRO72v1ogD9rLcUHN1HIJbMzkSfVNmRE/pub?gid=0&single=true&output=csv";
 
 const trim = (s) => (s ?? "").toString().trim();
 
