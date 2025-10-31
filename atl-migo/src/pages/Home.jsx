@@ -23,7 +23,7 @@ export default function Home() {
         <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,.55)"}}/>
         <div style={{position:"relative",maxWidth:760,padding:24}}>
           <h2>About Me</h2>
-          <p>Hello friends, family, and strangers! I’m William Lopez (CS: Software Engineering). This site tracks projects, fitness, and memories.</p>
+          <p>Hello friends, family, and strangers! I’m William Lopez and currently pursuing a degree in CS: Software Engineering. This site tracks projects, fitness, and memories.</p>
         </div>
       </section>
 
