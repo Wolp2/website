@@ -5,7 +5,7 @@ export default function Home() {
         display:"flex",alignItems:"center",justifyContent:"center",
         gap:20,flexWrap:"wrap",padding:20,background:"#333",color:"#fff"
       }}>
-        <img src="https://pub-f0e72ff68fee408a91e6354c79114b39.r2.dev/headshot.jpg" alt="William Lopez"
+        <img src="/headshot.jpg" alt="William Lopez"
              style={{width:130,height:130,borderRadius:"50%",objectFit:"cover",border:"3px solid #fff"}}/>
         <div>
           <h1>Welcome to My Website</h1>
@@ -15,7 +15,7 @@ export default function Home() {
 
       <section style={{
         position:"relative",height:"85vh",
-        backgroundImage:"url('https://pub-f0e72ff68fee408a91e6354c79114b39.r2.dev/halloween.jpg')",
+        backgroundImage:"url('/halloween.jpg')",
         backgroundSize:"cover",backgroundPosition:"center",
         display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",textAlign:"center",
         opacity:0, animation:"fade 1.5s ease-in forwards"
