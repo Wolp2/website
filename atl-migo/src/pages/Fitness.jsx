@@ -1,44 +1,37 @@
-// Fitness.jsx
 import { useEffect, useMemo, useState } from "react";
 
-/** ======= Published CSV URL here (yours) ======= */
 const SHEET_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vQZlEe5gpor6F0j6tRvsPrYhdrjOENGut0jUPdqTtyNYdefmRO72v1ogD9rLcUHN1HIJbMzkSfVNmRE/pub?gid=0&single=true&output=csv";
 
-/* ========= Helpers ========= */
 const trim = (s) => (s ?? "").toString().trim();
 
 function parseMDY(str) {
-  const m = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/.exec(trim(str));
+  const t = trim(str);
+  if (!t) return null;
+  const m = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/.exec(t);
   if (!m) return null;
   let [, mm, dd, yy] = m.map(Number);
   if (yy < 100) yy += yy >= 70 ? 1900 : 2000;
-  return new Date(yy, mm - 1, dd);
+  const d = new Date(yy, mm - 1, dd);
+  return isNaN(+d) ? null : d;
 }
+const fmtDate = (d) =>
+  d
+    ? d.toLocaleDateString(undefined, {
+        month: "2-digit",
+        day: "2-digit",
+        year: "numeric",
+      })
+    : "";
 
-function formatDate(d) {
-  try {
-    return d.toLocaleDateString(undefined, {
-      month: "2-digit",
-      day: "2-digit",
-      year: "numeric",
-    });
-  } catch {
-    return "";
-  }
-}
-
-// tiny CSV parser that handles quoted commas/newlines
 function parseCSV(text) {
   const rows = [];
   let i = 0,
     cur = "",
     row = [],
     inQ = false;
-
   while (i < text.length) {
     const ch = text[i];
-
     if (inQ) {
       if (ch === '"') {
         if (text[i + 1] === '"') {
@@ -67,7 +60,6 @@ function parseCSV(text) {
         cur = "";
         i++;
       } else if (ch === "\r") {
-        // normalize \r\n
         i++;
       } else {
         cur += ch;
@@ -75,26 +67,28 @@ function parseCSV(text) {
       }
     }
   }
-  // last cell
   row.push(cur);
   rows.push(row);
-  // drop empty trailing row
-  if (rows.length && rows[rows.length - 1].every((c) => trim(c) === "")) {
-    rows.pop();
-  }
+  if (rows.length && rows[rows.length - 1].every((c) => trim(c) === "")) rows.pop();
   return rows;
 }
-
-function indexByName(headers, nameCandidates) {
-  const target = headers.map((h) => trim(h).toLowerCase());
-  for (const name of nameCandidates) {
-    const i = target.indexOf(name.toLowerCase());
+const col = (headers, names) => {
+  const h = headers.map((x) => trim(x).toLowerCase());
+  for (const n of names) {
+    const i = h.indexOf(n.toLowerCase());
     if (i !== -1) return i;
   }
   return -1;
+};
+
+function paceFrom(distanceMiles, durationMin) {
+  if (!distanceMiles || !durationMin) return null;
+  const pace = durationMin / distanceMiles; // min per mile
+  const m = Math.floor(pace);
+  const s = Math.round((pace - m) * 60);
+  return `${m}:${String(s).padStart(2, "0")}/mi`;
 }
 
-/* ========= Component ========= */
 export default function Fitness() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -108,247 +102,241 @@ export default function Fitness() {
       try {
         const res = await fetch(SHEET_URL, { cache: "no-store" });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const csv = await res.text();
-        const parsed = parseCSV(csv);
+        const txt = await res.text();
         if (!alive) return;
-        setRows(parsed);
+        setRows(parseCSV(txt));
       } catch (e) {
-        if (!alive) return;
-        setErr("Could not load training log.");
         console.error(e);
+        if (alive) setErr("Could not load training log.");
       } finally {
         if (alive) setLoading(false);
       }
     })();
-    return () => {
-      alive = false;
-    };
+    return () => void (alive = false);
   }, []);
 
-  const data = useMemo(() => {
-    if (!rows.length) return { latestDate: null, tag: "", items: [] };
+  const { latestDate, latestItems, latestTag, history } = useMemo(() => {
+    if (!rows.length) return { latestDate: null, latestItems: [], latestTag: "", history: [] };
     const headers = rows[0];
     const body = rows.slice(1);
 
-    // Map columns by common header names (case-insensitive, flexible)
-    const colDate = indexByName(headers, ["date", "workout date", "day"]);
-    const colTag = indexByName(headers, ["tag", "focus", "split", "bodypart", "type"]);
-    const colExercise = indexByName(headers, ["exercise", "movement"]);
-    const colSets = indexByName(headers, ["sets"]);
-    const colReps = indexByName(headers, ["reps"]);
-    const colWeight = indexByName(headers, ["weight", "load", "lbs"]);
+    // Flexible header mapping
+    const cDate = col(headers, ["date", "workout date", "day"]);
+    const cTag = col(headers, ["tag", "focus", "split", "type", "bodypart"]);
+    const cEx = col(headers, ["exercise", "movement"]);
+    const cSets = col(headers, ["sets"]);
+    const cReps = col(headers, ["reps"]);
+    const cWt = col(headers, ["weight", "load", "lbs"]);
+    // Optional cardio columns if you keep them in the sheet
+    const cDist = col(headers, ["distance", "miles", "mi"]);
+    const cTime = col(headers, ["time", "duration", "mins", "minutes"]);
 
-    // Normalize rows
-    const normalized = body
-      .map((r) => ({
-        dateStr: trim(r[colDate] ?? ""),
-        date: parseMDY(r[colDate]),
-        tag: trim(r[colTag] ?? ""),
-        exercise: trim(r[colExercise] ?? ""),
-        sets: trim(r[colSets] ?? ""),
-        reps: trim(r[colReps] ?? ""),
-        weight: trim(r[colWeight] ?? ""),
-      }))
-      .filter((r) => r.exercise || r.reps || r.weight);
+    // ---- Forward-fill Date & Tag as we scan down the sheet ----
+    let curDate = null;
+    let curTag = "";
+    const entries = [];
+    for (const r of body) {
+      const dateCell = trim(r[cDate] ?? "");
+      const tagCell = trim(r[cTag] ?? "");
+      if (dateCell) curDate = parseMDY(dateCell) ?? curDate; // keep last valid date
+      if (tagCell) curTag = tagCell;
+
+      if (!curDate) continue; // skip pre-header junk
+
+      const ex = trim(r[cEx] ?? "");
+      const sets = trim(r[cSets] ?? "");
+      const reps = trim(r[cReps] ?? "");
+      const weight = trim(r[cWt] ?? "");
+      const distance = trim(r[cDist] ?? "");
+      const duration = trim(r[cTime] ?? "");
+
+      if (!(ex || reps || weight || distance || duration)) continue;
+
+      entries.push({
+        date: curDate,
+        tag: curTag,
+        exercise: ex,
+        sets,
+        reps,
+        weight,
+        distance,
+        duration,
+      });
+    }
+
+    if (!entries.length) return { latestDate: null, latestItems: [], latestTag: "", history: [] };
+
+    // Group by date
+    const byDate = new Map();
+    for (const e of entries) {
+      const key = e.date.toDateString();
+      if (!byDate.has(key)) byDate.set(key, []);
+      byDate.get(key).push(e);
+    }
 
     // Find latest date
-    const withDates = normalized.filter((r) => r.date instanceof Date && !isNaN(r.date));
-    if (!withDates.length) return { latestDate: null, tag: "", items: [] };
-    const latestDate = withDates.reduce((a, b) => (a.date > b.date ? a : b)).date;
+    const allDates = [...byDate.values()].map((list) => list[0].date);
+    allDates.sort((a, b) => b - a);
+    const latestDate = allDates[0];
 
-    // Use the first tag on that date (if any)
-    const dateKey = latestDate.toDateString();
-    const todays = withDates.filter((r) => r.date.toDateString() === dateKey);
-    const tag = todays.find((r) => r.tag)?.tag ?? "";
+    const latestItems = byDate.get(latestDate.toDateString()) ?? [];
+    const latestTag = latestItems.find((x) => x.tag)?.tag ?? "";
 
-    // Group by exercise (some sheets put blank rows for headings)
-    const items = todays
-      .filter((r) => r.exercise)
-      .map((r) => ({
-        exercise: r.exercise,
-        sets: r.sets || "-",
-        reps: r.reps || "-",
-        weight: r.weight ? `${r.weight}` : "-",
-      }));
+    // Build recent history (last 7 sessions excluding latest)
+    const historyDates = allDates.slice(1, 8);
+    const history = historyDates.map((d) => ({
+      date: d,
+      tag: (byDate.get(d.toDateString()).find((x) => x.tag) || {}).tag || "",
+      items: byDate.get(d.toDateString()),
+    }));
 
-    return { latestDate, tag, items };
+    return { latestDate, latestItems, latestTag, history };
   }, [rows]);
-
-  const dateLabel = data.latestDate ? formatDate(data.latestDate) : "";
 
   return (
     <main className="fitness-wrap">
       <section className="container">
-        <header className="page-head">
+        <header className="hero">
           <h1>My Training Log</h1>
           <p className="sub">Live from Google Sheets — lifts + runs.</p>
         </header>
 
-        <div className="panel">
+        <section className="panel">
           <div className="panel-head">
-            <h2 className="panel-title">Latest Workout — {dateLabel || "—"}</h2>
-            {data.tag ? <span className="tag">{data.tag}</span> : null}
+            <h2 className="panel-title">
+              Latest Workout — {latestDate ? fmtDate(latestDate) : "—"}
+            </h2>
+            {latestTag ? <span className="tag">{latestTag}</span> : null}
           </div>
 
-          {loading && (
-            <div className="loading">Loading latest session…</div>
-          )}
-          {!!err && <div className="error">{err}</div>}
+          {loading && <div className="info">Loading latest session…</div>}
+          {!!err && <div className="info error">{err}</div>}
 
-          {!loading && !err && data.items.length === 0 && (
-            <div className="empty">No entries for the latest date.</div>
+          {!loading && !err && (
+            <div className="workout-log">
+              {latestItems.map((w, i) => (
+                <ExerciseOrRun key={i} item={w} />
+              ))}
+              {latestItems.length === 0 && (
+                <div className="info">No entries for the latest date.</div>
+              )}
+            </div>
           )}
+        </section>
 
-          <div className="workout-log">
-            {data.items.map((w, i) => (
-              <div key={i} className="exercise-card">
-                <div className="exercise-header">
-                  <h3>{w.exercise}</h3>
-                  <span className="weight">{w.weight}</span>
+        {/* ---- Recent history ---- */}
+        {!loading && !err && history.length > 0 && (
+          <section className="history">
+            <h3 className="history-title">Recent Workouts</h3>
+            {history.map((h, i) => (
+              <details key={i} className="history-day">
+                <summary>
+                  <span>{fmtDate(h.date)}</span>
+                  {h.tag ? <em className="small-tag">{h.tag}</em> : null}
+                </summary>
+                <div className="history-items">
+                  {h.items.map((it, j) => (
+                    <ExerciseOrRun key={j} item={it} compact />
+                  ))}
                 </div>
-                <div className="sets-reps">
-                  <p>
-                    <strong>Sets:</strong> {w.sets}
-                  </p>
-                  <p>
-                    <strong>Reps:</strong> {w.reps}
-                  </p>
-                </div>
-              </div>
+              </details>
             ))}
-          </div>
-        </div>
+          </section>
+        )}
 
         <footer className="site-foot">© {new Date().getFullYear()} William Lopez</footer>
       </section>
 
-      {/* ---- Minimal, mobile-first CSS (scoped globally). 
-         If you prefer, move this to fitness.css and import it. ---- */}
       <style>{`
         :root {
-          --bg: #f7f7fb;
-          --text: #111827;
-          --muted: #6b7280;
+          --bg: #f6f7fb;
+          --text: #0f172a;
+          --muted: #64748b;
           --card: #ffffff;
           --line: #e5e7eb;
           --accent: #16a34a;
-          --accent-2: #22c55e;
+          --accent2: #22c55e;
         }
+        .fitness-wrap { background: var(--bg); min-height: 100dvh; color: var(--text); }
+        .container { max-width: 860px; margin: 0 auto; padding: 1rem clamp(1rem, 3vw, 1.25rem) 2rem; }
 
-        .fitness-wrap {
-          background: var(--bg);
-          min-height: 100dvh;
-          color: var(--text);
-        }
-        .container {
-          max-width: 860px;
-          margin: 0 auto;
-          padding: 1rem clamp(1rem, 3vw, 1.25rem) 2.5rem;
-        }
+        .hero h1 { font-size: clamp(1.7rem, 4vw, 2.4rem); margin: 0; font-weight: 800; letter-spacing: -0.02em; }
+        .sub { margin: .2rem 0 1rem; color: var(--muted); }
 
-        .page-head h1 {
-          font-size: clamp(1.6rem, 3.5vw, 2.25rem);
-          margin: 0 0 .25rem 0;
-          font-weight: 800;
-          letter-spacing: -0.02em;
-        }
-        .sub {
-          margin: 0 0 1rem 0;
-          color: var(--muted);
-        }
+        .panel { background: var(--card); border: 1px solid #d1fae5; border-radius: 16px; padding: 1rem; box-shadow: 0 2px 6px rgba(0,0,0,.04); }
+        .panel-head { display:flex; align-items:center; gap:.6rem; margin-bottom:.75rem; }
+        .panel-title { margin:0; font-size:1.1rem; font-weight:700; }
+        .tag { background: linear-gradient(135deg, var(--accent2), var(--accent)); color:#fff; padding:.2rem .6rem; border-radius:999px; font-size:.8rem; }
 
-        .panel {
-          background: var(--card);
-          border: 1px solid #d1fae5;
-          border-radius: 16px;
-          padding: 0.9rem;
-          box-shadow: 0 2px 6px rgba(0,0,0,.04);
-        }
-        @media (min-width: 640px) {
-          .panel { padding: 1.2rem; }
-        }
+        .workout-log { display:flex; flex-direction:column; gap:.8rem; }
 
-        .panel-head {
-          display: flex;
-          align-items: center;
-          gap: .6rem;
-          margin-bottom: .75rem;
-        }
-        .panel-title {
-          font-size: 1.1rem;
-          font-weight: 700;
-          margin: 0;
-        }
+        .card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:.85rem; }
+        .card.compact { padding:.7rem; }
+        .head { display:flex; justify-content:space-between; align-items:baseline; gap:.5rem; padding-bottom:.35rem; margin-bottom:.45rem; border-bottom:1px solid #eee; }
+        .title { font-size:1.05rem; font-weight:700; margin:0; }
+        .pill { background:#e6f6ee; color:#256d40; padding:.2rem .55rem; border-radius:8px; font-size:.9rem; white-space:nowrap; }
 
-        .tag {
-          background: linear-gradient(135deg, var(--accent-2), var(--accent));
-          color: #fff;
-          font-size: .8rem;
-          padding: .2rem .6rem;
-          border-radius: 999px;
-        }
+        .kv { margin:.22rem 0; font-size:.95rem; }
+        .muted { color: var(--muted); }
 
-        .loading, .error, .empty {
-          padding: .8rem 1rem;
-          border-radius: 12px;
-          font-size: .95rem;
-          background: #f9fafb;
-          border: 1px solid var(--line);
-          margin-bottom: .75rem;
-        }
-        .error { border-color: #fecaca; background: #fff1f2; }
+        .run-line { display:flex; flex-wrap:wrap; gap:.5rem 1rem; font-size:.95rem; }
+        .run-chip { background:#eef2ff; border:1px solid #e5e7eb; padding:.15rem .5rem; border-radius:8px; }
 
-        .workout-log {
-          display: flex;
-          flex-direction: column;
-          gap: .8rem;
-        }
+        .info { background:#f9fafb; border:1px solid var(--line); border-radius:12px; padding:.8rem 1rem; }
+        .info.error { border-color:#fecaca; background:#fff1f2; }
 
-        .exercise-card {
-          background: #fff;
-          border: 1px solid var(--line);
-          border-radius: 14px;
-          padding: .9rem;
-        }
-        @media (min-width: 600px) {
-          .exercise-card { padding: 1.1rem 1.2rem; }
-        }
+        .history { margin-top:1rem; }
+        .history-title { margin:.2rem 0 .6rem; font-size:1.05rem; font-weight:700; color:#0f172a; }
+        .history-day { background:#fff; border:1px solid var(--line); border-radius:12px; margin-bottom:.6rem; padding:.2rem .6rem; }
+        .history-day summary { cursor:pointer; display:flex; align-items:center; gap:.5rem; padding:.5rem 0; list-style:none; }
+        .history-day summary::-webkit-details-marker { display:none; }
+        .small-tag { color: var(--muted); font-style:normal; font-size:.9rem; }
 
-        .exercise-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: baseline;
-          border-bottom: 1px solid #eee;
-          padding-bottom: .35rem;
-          margin-bottom: .45rem;
-          gap: .5rem;
-        }
-        .exercise-header h3 {
-          font-size: 1.05rem;
-          font-weight: 700;
-          margin: 0;
-        }
-        .weight {
-          background: #e6f6ee;
-          color: #256d40;
-          padding: .2rem .55rem;
-          border-radius: 8px;
-          font-size: .9rem;
-          white-space: nowrap;
-        }
-        .sets-reps p {
-          margin: .25rem 0;
-          font-size: .95rem;
-          line-height: 1.45;
-        }
+        .history-items { padding: .2rem 0 .6rem; display:flex; flex-direction:column; gap:.5rem; }
 
-        .site-foot {
-          text-align: center;
-          color: var(--muted);
-          margin-top: 1.25rem;
-          font-size: .9rem;
-        }
+        .site-foot { text-align:center; color:var(--muted); margin-top:1.25rem; font-size:.9rem; }
       `}</style>
     </main>
+  );
+}
+
+/* ---------- Small renderer that shows either a Lift card or a Run card ---------- */
+function ExerciseOrRun({ item, compact }) {
+  const isRun =
+    /run|jog|treadmill|mile|miles|cardio/i.test(item.exercise || "") ||
+    item.distance ||
+    item.duration ||
+    /run|cardio/i.test(item.tag || "");
+
+  if (isRun) {
+    // try to parse distance/time for pace
+    const dist = parseFloat((item.distance || "").replace(/[^\d.]/g, "")) || null;
+    const mins = parseFloat((item.duration || "").replace(/[^\d.]/g, "")) || null;
+    const pace = paceFrom(dist, mins);
+
+    return (
+      <div className={`card ${compact ? "compact" : ""}`}>
+        <div className="head">
+          <h4 className="title">{item.exercise || "Run"}</h4>
+        </div>
+        <div className="run-line">
+          {dist != null && <span className="run-chip">{dist} mi</span>}
+          {mins != null && <span className="run-chip">{mins} min</span>}
+          {pace && <span className="run-chip">{pace}</span>}
+          {!dist && !mins && item.reps && <span className="muted">{item.reps}</span>}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`card ${compact ? "compact" : ""}`}>
+      <div className="head">
+        <h4 className="title">{item.exercise || "—"}</h4>
+        {item.weight ? <span className="pill">{item.weight}</span> : null}
+      </div>
+      <div className="kv"><strong>Sets:</strong> {item.sets || "-"}</div>
+      <div className="kv"><strong>Reps:</strong> {item.reps || "-"}</div>
+    </div>
   );
 }
