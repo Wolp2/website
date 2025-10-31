@@ -41,6 +41,13 @@ function catClass(cat) {
   return "cat-other";
 }
 
+/** Count sets from a reps string like "10/10/10-8" */
+function inferSetsFromReps(repsStr) {
+  if (!repsStr) return "";
+  const normalized = String(repsStr).replace(/-/g, "/").replace(/\s+/g, "");
+  return normalized.split("/").filter(Boolean).length || "";
+}
+
 /** Summarize the day's run (distance/duration/notes) once per day */
 function getRunSummary(day) {
   if (!day?.items?.length) return null;
@@ -91,7 +98,10 @@ export default function Fitness() {
         const iCat = idx("category"); // may be -1
         const iEx = idx("exercise");
         const iW = idx("weight");
-        const iR = idx("reps/sets");
+        // NEW: look for "sets" and "reps"; keep backward-compat for "reps/sets"
+        const iSets = idx("sets");
+        const iReps = idx("reps");
+        const iRepsSets = idx("reps/sets"); // legacy
         const iD = idx("distance(mi)");
         const iT = idx("duration(min)");
         const iNotes = idx("notes");
@@ -113,7 +123,12 @@ export default function Fitness() {
           const ex = trim(r[iEx]);
 
           const weight = iW >= 0 ? trim(r[iW]) : "";
-          const reps = iR >= 0 ? trim(r[iR]) : "";
+          // prefer new columns; fallback to legacy "reps/sets"
+          let reps = iReps >= 0 ? trim(r[iReps]) : "";
+          let sets = iSets >= 0 ? trim(r[iSets]) : "";
+          if (!reps && iRepsSets >= 0) reps = trim(r[iRepsSets]);
+          if (!sets && reps) sets = inferSetsFromReps(reps);
+
           const dist = iD >= 0 ? trim(r[iD]) : "";
           const dur = iT >= 0 ? trim(r[iT]) : "";
           const notes = iNotes >= 0 ? trim(r[iNotes]) : "";
@@ -132,6 +147,7 @@ export default function Fitness() {
             category: c,
             exercise: ex,
             weight,
+            sets,
             reps,
             distance: dist,
             duration: dur,
@@ -236,10 +252,11 @@ export default function Fitness() {
         .list { margin:10px 0 0; padding:0; list-style:none; }
         .row {
           display:grid;
-          grid-template-columns: 1fr 110px 120px; /* 3 columns: Exercise | Weight | Reps/Sets */
+          grid-template-columns: 1fr 110px 70px 1fr; /* Exercise | Weight | Sets | Reps */
           gap:10px;
           padding:10px 0;
           border-bottom:1px solid #eee;
+          align-items:center;
         }
         .row:last-child { border-bottom:none; }
         .hdr { font-weight:700; border-bottom:2px solid #ddd; }
@@ -327,18 +344,23 @@ function HeaderRow() {
     <li className="row hdr">
       <span className="exercise">Exercise</span>
       <span className="tag">Weight</span>
-      <span className="tag">Reps/Sets</span>
+      <span className="tag">Sets</span>
+      <span className="tag">Reps</span>
     </li>
   );
 }
 
 function Row({ item }) {
-  // only lift metrics shown in rows; run is summarized once per day
+  // Show lift metrics in rows; runs are summarized once per day above
+  const setsDisplay = item.sets || (item.reps ? inferSetsFromReps(item.reps) : "-");
+  const repsDisplay = item.reps || "-";
+
   return (
     <li className="row">
       <span className="exercise">{item.exercise}</span>
       <span className="tag">{item.weight || "-"}</span>
-      <span className="tag">{item.reps || "-"}</span>
+      <span className="tag">{setsDisplay}</span>
+      <span className="tag">{repsDisplay}</span>
     </li>
   );
 }

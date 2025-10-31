@@ -1,0 +1,5 @@
+[
+  { "id": "cc-1", "title": "A Smarter way to learn Python", "author": "Mark Myers", "status": "Completed", "progress": 100 },
+  { "id": "dp-1", "title": "Go Programming Language for dummies", "author": "Wei-Meng Lee", "status": "Reading", "progress": 0 },
+  { "id": "pp-1", "title": "Dog Man 12: The Scarlet Shedder PB", "author": "Dav Pilkey", "status": "Wishlist", "progress": 0 }
+]
