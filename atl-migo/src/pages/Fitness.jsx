@@ -24,24 +24,23 @@ function inferCategory(exercise) {
   return "Other";
 }
 
+/** Quote-aware CSV parser (handles commas inside quotes) */
 function parseCSV(text) {
   const lines = text.replace(/\r\n?/g, "\n").split("\n");
-
   const rows = [];
+
   for (const raw of lines) {
-    if (!raw) continue;
+    if (raw === "") continue;
     const out = [];
     let cur = "";
     let inQuotes = false;
 
     for (let i = 0; i < raw.length; i++) {
       const ch = raw[i];
-
       if (ch === '"') {
-        // Toggle quotes, unless it's an escaped quote ("")
         if (inQuotes && raw[i + 1] === '"') {
-          cur += '"';
-          i++; // skip the escaped quote
+          cur += '"'; // escaped quote
+          i++;
         } else {
           inQuotes = !inQuotes;
         }
@@ -74,15 +73,22 @@ function inferSetsFromReps(repsStr) {
   return normalized.split("/").filter(Boolean).length || "";
 }
 
+/** Cardio detector used for tables and mileage */
+function isCardio(item) {
+  const c = (item?.category || "").toLowerCase();
+  const ex = (item?.exercise || "");
+  return (
+    c.includes("cardio") ||
+    /run|treadmill|bike|cycling/i.test(ex) ||
+    !!item?.distance ||
+    !!item?.duration
+  );
+}
+
 /** Summarize the day's run (distance/duration/notes) once per day */
 function getRunSummary(day) {
   if (!day?.items?.length) return null;
-  const runs = day.items.filter(
-    (it) =>
-      trim(it.distance) ||
-      trim(it.duration) ||
-      /run|treadmill/i.test(it.exercise)
-  );
+  const runs = day.items.filter(isCardio);
   if (!runs.length) return null;
 
   const totalMiles = runs.reduce((s, it) => s + (parseFloat(it.distance) || 0), 0);
@@ -114,23 +120,28 @@ export default function Fitness() {
         const rows = parseCSV(csv);
         if (rows.length < 2) throw new Error("CSV has no data rows.");
 
-        // normalize header
-        const header = rows[0].map((h) =>
-          h.toLowerCase().replace(/\s+/g, "")
-        );
-        const idx = (name) => header.indexOf(name);
+        // ---- Flexible header matching ----
+        const rawHeader = rows[0];
+        const norm = (s) => s.toLowerCase().replace(/\s+/g, "").replace(/[^\w]/g, "");
+        const header = rawHeader.map(norm);
+        const find = (...aliases) => {
+          for (const a of aliases.map(norm)) {
+            const ix = header.indexOf(a);
+            if (ix !== -1) return ix;
+          }
+          return -1;
+        };
 
-        const iDate = idx("date");
-        const iCat = idx("category"); // may be -1
-        const iEx = idx("exercise");
-        const iW = idx("weight");
-        // NEW: look for "sets" and "reps"; keep backward-compat for "reps/sets"
-        const iSets = idx("sets");
-        const iReps = idx("reps");
-        const iRepsSets = idx("reps/sets"); // legacy
-        const iD = idx("distance(mi)");
-        const iT = idx("duration(min)");
-        const iNotes = idx("notes");
+        const iDate  = find("date");
+        const iCat   = find("category");
+        const iEx    = find("exercise");
+        const iW     = find("weight");
+        const iSets  = find("sets");
+        const iReps  = find("reps", "repssets"); // allow legacy naming
+        const iRS    = find("repssets");         // explicit legacy column
+        const iD     = find("distance(mi)", "distance");
+        const iT     = find("duration(min)", "duration");
+        const iNotes = find("notes");
 
         if (iDate === -1 || iEx === -1) {
           throw new Error(`Missing required columns. Found: [${rows[0].join(", ")}]`);
@@ -149,10 +160,9 @@ export default function Fitness() {
           const ex = trim(r[iEx]);
 
           const weight = iW >= 0 ? trim(r[iW]) : "";
-          // prefer new columns; fallback to legacy "reps/sets"
           let reps = iReps >= 0 ? trim(r[iReps]) : "";
+          if (!reps && iRS >= 0) reps = trim(r[iRS]); // legacy
           let sets = iSets >= 0 ? trim(r[iSets]) : "";
-          if (!reps && iRepsSets >= 0) reps = trim(r[iRepsSets]);
           if (!sets && reps) sets = inferSetsFromReps(reps);
 
           const dist = iD >= 0 ? trim(r[iD]) : "";
@@ -212,7 +222,7 @@ export default function Fitness() {
     };
   }, []);
 
-  // Weekly mileage (last 7 days)
+  // Weekly mileage (last 7 days) — cardio only
   const last7dMiles = useMemo(() => {
     if (!days) return 0;
     const now = new Date();
@@ -222,6 +232,7 @@ export default function Fitness() {
     days.forEach((d) => {
       if (d.dateObj >= weekAgo) {
         d.items.forEach((it) => {
+          if (!isCardio(it)) return;
           const miles = parseFloat(it.distance);
           if (!isNaN(miles)) total += miles;
         });
@@ -321,7 +332,7 @@ function LatestCard({ day }) {
 
       <ul className="list">
         <HeaderRow />
-        {day.items.map((it, i) => (
+        {day.items.filter((it) => !isCardio(it)).map((it, i) => (
           <Row key={i} item={it} />
         ))}
       </ul>
@@ -354,7 +365,7 @@ function History({ days }) {
 
             <ul className="list">
               <HeaderRow />
-              {day.items.map((it, i) => (
+              {day.items.filter((it) => !isCardio(it)).map((it, i) => (
                 <Row key={i} item={it} />
               ))}
             </ul>
@@ -377,7 +388,6 @@ function HeaderRow() {
 }
 
 function Row({ item }) {
-  // Show lift metrics in rows; runs are summarized once per day above
   const setsDisplay = item.sets || (item.reps ? inferSetsFromReps(item.reps) : "-");
   const repsDisplay = item.reps || "-";
 
