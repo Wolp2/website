@@ -404,9 +404,9 @@ export default function Fitness() {
               {shownRuns.map((r, i) => (
                 <div key={i} className="runs-row">
                   <div className="col date">{fmtDate(r.date)}</div>
-                  <div className="col dist">{r.miles || ""}</div>
-                  <div className="col time">{r.minutes || ""}</div>
-                  <div className="col notes">{r.notes || ""}</div>
+                  <div className="col dist">miles: {r.miles || ""}</div>
+                  <div className="col time">minutes: {r.minutes || ""}</div>
+                  <div className="col notes">notes: {r.notes || ""}</div>
                 </div>
               ))}
             </div>
