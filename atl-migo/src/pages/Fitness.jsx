@@ -34,6 +34,54 @@ function paceFrom(distanceMiles, durationMin) {
   return `${m}:${String(s).padStart(2, "0")}/mi`;
 }
 
+const toMinutes = (v) => {
+  if (v == null) return 0;
+  if (typeof v === "number") return v;
+
+  const s = String(v).trim().toLowerCase();
+
+  // pure number => already minutes (supports "29" or "29.5")
+  if (/^\d+(\.\d+)?$/.test(s)) return parseFloat(s);
+
+  // mm:ss or hh:mm:ss
+  if (s.includes(":")) {
+    const parts = s.split(":").map((x) => parseFloat(x) || 0);
+    if (parts.length === 3) {
+      const [hh, mm, ss] = parts;
+      return hh * 60 + mm + ss / 60;
+    } else {
+      const [mm, ss] = parts;
+      return mm + ss / 60;
+    }
+  }
+
+  // words: "29 minutes and 20 seconds", "1h 5m 30s", etc.
+  const m = s.match(
+    /(?:(\d+(?:\.\d+)?)\s*h(?:ours?)?)?\s*(?:(\d+(?:\.\d+)?)\s*m(?:in(?:ute)?s?)?)?\s*(?:(\d+(?:\.\d+)?)\s*s(?:ec(?:ond)?s?)?)?/
+  );
+  if (m) {
+    const h = parseFloat(m[1] || 0);
+    const min = parseFloat(m[2] || 0);
+    const sec = parseFloat(m[3] || 0);
+    if (h || min || sec) return h * 60 + min + sec / 60;
+  }
+
+  // last resort: strip to digits/colons and try again
+  const cleaned = s.replace(/[^\d:.]/g, "");
+  if (cleaned.includes(":")) return toMinutes(cleaned);
+  if (/^\d+(\.\d+)?$/.test(cleaned)) return parseFloat(cleaned);
+
+  return 0;
+};
+
+const formatDuration = (minutesFloat) => {
+  const totalSeconds = Math.round(minutesFloat * 60);
+  let mm = Math.floor(totalSeconds / 60);
+  let ss = totalSeconds % 60;
+  if (ss === 60) { mm += 1; ss = 0; }
+  return ss ? `${mm}:${String(ss).padStart(2, "0")}` : `${mm} min`;
+};
+
 function parseCSV(text) {
   const rows = [];
   let i = 0,
@@ -224,7 +272,7 @@ export default function Fitness() {
       minTotal = 0;
     for (const r of latestRuns) {
       const d = parseFloat(r.miles.replace(/[^\d.]/g, ""));
-      const m = parseFloat(r.minutes.replace(/[^\d.]/g, ""));
+      const m = toMinutes(r.minutes);               // <-- changed
       if (!isNaN(d)) miTotal += d;
       if (!isNaN(m)) minTotal += m;
     }
@@ -310,7 +358,7 @@ export default function Fitness() {
                         <span className="chip">{runTotalsLatest.miles.toFixed(2)} mi</span>
                       )}
                       {runTotalsLatest.minutes > 0 && (
-                        <span className="chip">{Math.round(runTotalsLatest.minutes)} min</span>
+                        <span className="chip">{formatDuration(runTotalsLatest.minutes)}</span> {/* <-- changed */}
                       )}
                       {runTotalsLatest.pace && (
                         <span className="chip">{runTotalsLatest.pace}</span>
@@ -321,7 +369,7 @@ export default function Fitness() {
                         <div key={i} className="run-row">
                           <span className="run-meta">
                             {parseFloat(r.miles || 0) || ""}{r.miles ? " mi" : ""}
-                            {r.minutes ? ` · ${Math.round(parseFloat(r.minutes))} min` : ""}
+                            {r.minutes ? ` · ${formatDuration(toMinutes(r.minutes))}` : ""} {/* <-- changed */}
                           </span>
                           {r.notes && <span className="run-notes">{r.notes}</span>}
                         </div>
@@ -404,9 +452,9 @@ export default function Fitness() {
               {shownRuns.map((r, i) => (
                 <div key={i} className="runs-row">
                   <div className="col date">{fmtDate(r.date)}</div>
-                  <div className="col dist">miles: {r.miles || ""}</div>
-                  <div className="col time">minutes: {r.minutes || ""}</div>
-                  <div className="col notes">notes: {r.notes || ""}</div>
+                  <div className="col dist">Distance: {r.miles || ""}</div>
+                  <div className="col time">Time: {r.minutes || ""}</div>
+                  <div className="col notes">Notes: {r.notes || ""}</div>
                 </div>
               ))}
             </div>
@@ -493,11 +541,13 @@ function LiftCard({ item, compact }) {
 }
 function RunCard({ item, compact }) {
   const dist = item.miles ? parseFloat(item.miles.replace(/[^\d.]/g, "")) : null;
-  const mins = item.minutes ? parseFloat(item.minutes.replace(/[^\d.]/g, "")) : null;
+  const mins = item.minutes ? toMinutes(item.minutes) : null; // <-- changed
   const pace = dist && mins ? paceFrom(dist, mins) : null;
   return (
     <div className={`card ${compact ? "compact" : ""}`}>
-      <div className="kv"><strong>Run:</strong> {dist ? `${dist} mi` : ""}{mins ? ` · ${Math.round(mins)} min` : ""}{pace ? ` · ${pace}` : ""}</div>
+      <div className="kv">
+        <strong>Run:</strong> {dist ? `${dist} mi` : ""}{mins ? ` · ${formatDuration(mins)}` : ""}{pace ? ` · ${pace}` : ""}
+      </div>
       {item.notes && <div className="kv" style={{color:"#64748b"}}>{item.notes}</div>}
     </div>
   );
