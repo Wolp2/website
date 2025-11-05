@@ -1,13 +1,13 @@
 import React from "react";
-import "./Home.module.css";
+import styles from "./Home.module.css";
 
 export default function Home() {
   return (
     <main className="home-page">
       {/* ===== Hero Section ===== */}
-      <header className="hero">
-        <div className="hero-overlay">
-          <div className="hero-content">
+      <header className={styles.hero}>
+        <div className={styles["hero-overlay"]}>
+          <div className={styles["hero-content"]}>
             <img
               src="/headshot.jpg"
               alt="Profile"
