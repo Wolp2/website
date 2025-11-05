@@ -358,7 +358,7 @@ export default function Fitness() {
                         <span className="chip">{runTotalsLatest.miles.toFixed(2)} mi</span>
                       )}
                       {runTotalsLatest.minutes > 0 && (
-                        <span className="chip">{formatDuration(runTotalsLatest.minutes)}</span> {/* <-- changed */}
+                        <span className="chip">{formatDuration(runTotalsLatest.minutes)}</span>
                       )}
                       {runTotalsLatest.pace && (
                         <span className="chip">{runTotalsLatest.pace}</span>
@@ -369,7 +369,7 @@ export default function Fitness() {
                         <div key={i} className="run-row">
                           <span className="run-meta">
                             {parseFloat(r.miles || 0) || ""}{r.miles ? " mi" : ""}
-                            {r.minutes ? ` · ${formatDuration(toMinutes(r.minutes))}` : ""} {/* <-- changed */}
+                            {r.minutes ? ` · ${formatDuration(toMinutes(r.minutes))}` : ""}
                           </span>
                           {r.notes && <span className="run-notes">{r.notes}</span>}
                         </div>
