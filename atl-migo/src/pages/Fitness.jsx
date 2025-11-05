@@ -174,8 +174,8 @@ export default function Fitness() {
     latestTag,
     latestRuns,
     runTotalsLatest,
-    historyAll, // sessions newest→oldest (excluding latest)
-    runsAll,    // every run row newest→oldest
+    historyAll, 
+    runsAll,   
   } = useMemo(() => {
     if (!rows.length)
       return {
@@ -191,7 +191,7 @@ export default function Fitness() {
     const headers = rows[0];
     const body = rows.slice(1);
 
-    // Exact headers (with a couple aliases, just in case)
+    // Identify columns
     const cDate = col(headers, ["date"]);
     const cCat = col(headers, ["category", "tag", "focus", "split", "type"]);
     const cEx = col(headers, ["exercise"]);
