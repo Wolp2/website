@@ -76,10 +76,13 @@ const toMinutes = (v) => {
 
 const formatDuration = (minutesFloat) => {
   const totalSeconds = Math.round(minutesFloat * 60);
-  let mm = Math.floor(totalSeconds / 60);
-  let ss = totalSeconds % 60;
-  if (ss === 60) { mm += 1; ss = 0; }
-  return ss ? `${mm}:${String(ss).padStart(2, "0")}` : `${mm} min`;
+  const mm = Math.floor(totalSeconds / 60);
+  const ss = totalSeconds % 60;
+  const minLabel = mm === 1 ? "minute" : "minutes";
+  const secLabel = ss === 1 ? "second" : "seconds";
+  if (ss === 0) return `${mm} ${minLabel}`;
+  if (mm === 0) return `${ss} ${secLabel}`;
+  return `${mm} ${minLabel} and ${ss} ${secLabel}`;
 };
 
 function parseCSV(text) {
@@ -358,22 +361,11 @@ export default function Fitness() {
                         <span className="chip">{runTotalsLatest.miles.toFixed(2)} mi</span>
                       )}
                       {runTotalsLatest.minutes > 0 && (
-                        <span className="chip">{formatDuration(runTotalsLatest.minutes)}</span>
+                        <span className="chip">{formatDuration(runTotalsLatest.minutes)} </span>
                       )}
                       {runTotalsLatest.pace && (
                         <span className="chip">{runTotalsLatest.pace}</span>
                       )}
-                    </div>
-                    <div className="run-list">
-                      {latestRuns.map((r, i) => (
-                        <div key={i} className="run-row">
-                          <span className="run-meta">
-                            {parseFloat(r.miles || 0) || ""}{r.miles ? " mi" : ""}
-                            {r.minutes ? ` · ${formatDuration(toMinutes(r.minutes))}` : ""}
-                          </span>
-                          {r.notes && <span className="run-notes">{r.notes}</span>}
-                        </div>
-                      ))}
                     </div>
                   </>
                 )}
