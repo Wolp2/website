@@ -1,0 +1,69 @@
+.fitnessWrap {
+  --bg:#f6f7fb; --text:#0f172a; --muted:#64748b; --card:#fff; --line:#e5e7eb;
+  --accent:#16a34a; --accent2:#22c55e;
+  background:var(--bg);
+  min-height:100dvh;
+  color:var(--text);
+}
+
+.container { max-width:860px; margin:0 auto; padding:1rem clamp(1rem,3vw,1.25rem) 2rem; }
+
+/* Hero */
+.hero h1 { font-size:clamp(1.7rem,4vw,2.4rem); margin:0; font-weight:800; letter-spacing:-.02em; }
+.sub { margin:.2rem 0 1rem; color:var(--muted); }
+
+/* Panel */
+.panel { background:var(--card); border:1px solid #d1fae5; border-radius:16px; padding:1rem; box-shadow:0 2px 6px rgba(0,0,0,.04); }
+.panelHead { display:flex; align-items:center; gap:.6rem; margin-bottom:.6rem; }
+.panelTitle { margin:0; font-size:1.1rem; font-weight:700; }
+.tag { background:linear-gradient(135deg,var(--accent2),var(--accent)); color:#fff; padding:.2rem .6rem; border-radius:999px; font-size:.8rem; }
+
+/* Cards */
+.workoutLog { display:flex; flex-direction:column; gap:.8rem; }
+.card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:.85rem; }
+.compact { padding:.7rem; }
+.head { display:flex; justify-content:space-between; align-items:baseline; gap:.5rem; padding-bottom:.35rem; margin-bottom:.45rem; border-bottom:1px solid #eee; }
+.title { margin:0; font-size:1.05rem; font-weight:700; }
+.pill { background:#e6f6ee; color:#256d40; padding:.2rem .55rem; border-radius:8px; font-size:.9rem; white-space:nowrap; }
+.kv { margin:.22rem 0; font-size:.95rem; }
+
+/* Latest Run */
+.runsLatest { margin-top:1rem; }
+.sectionTitle { font-size:1.05rem; margin:.2rem 0 .5rem; font-weight:700; }
+.totals { display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:.6rem; }
+.chip { background:#eef2ff; border:1px solid var(--line); padding:.2rem .55rem; border-radius:999px; font-size:.9rem; }
+.runList { display:flex; flex-direction:column; gap:.4rem; }
+.runRow { background:#fff; border:1px dashed var(--line); border-radius:10px; padding:.6rem .7rem; display:flex; flex-direction:column; gap:.25rem; }
+.runMeta { font-size:.95rem; }
+.runNotes { color:var(--muted); font-size:.9rem; }
+
+/* Info */
+.info { background:#f9fafb; border:1px solid var(--line); border-radius:12px; padding:.8rem 1rem; }
+.error { border-color:#fecaca; background:#fff1f2; }
+
+/* History */
+.history { margin-top:1rem; }
+.historyBar { display:flex; justify-content:space-between; align-items:center; gap:.6rem; margin-bottom:.5rem; }
+.historyTitle { margin:0; font-size:1.05rem; font-weight:700; }
+.historyActions { display:flex; gap:.4rem; }
+.btn { appearance:none; border:1px solid var(--line); background:#fff; border-radius:8px; padding:.35rem .6rem; font-size:.9rem; cursor:pointer; }
+.btn:active { transform: translateY(1px); }
+
+.historyDay { background:#fff; border:1px solid var(--line); border-radius:12px; margin-bottom:.6rem; padding:.2rem .6rem; }
+.historyDay summary { cursor:pointer; display:flex; align-items:center; gap:.5rem; padding:.5rem 0; list-style:none; }
+.historyDay summary::-webkit-details-marker { display:none; }
+.smallTag { color:var(--muted); font-style:normal; font-size:.9rem; }
+.historyItems { padding:.2rem 0 .6rem; display:flex; flex-direction:column; gap:.5rem; }
+
+/* Runs History Table */
+.runsHistory { margin-top:1rem; }
+.runsTable { display:flex; flex-direction:column; gap:.5rem; }
+.runsRow { display:grid; grid-template-columns: 110px 90px 100px 1fr; gap:.5rem; background:#fff; border:1px solid var(--line); border-radius:10px; padding:.55rem .7rem; }
+.col { font-size:.95rem; }
+.notes { color:var(--muted); }
+
+@media (max-width: 480px){
+  .runsRow { grid-template-columns: 95px 80px 90px 1fr; }
+}
+
+.siteFoot { text-align:center; color:var(--muted); margin-top:1.25rem; font-size:.9rem; }
