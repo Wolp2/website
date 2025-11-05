@@ -8,7 +8,7 @@ export default function Home() {
         <div className="hero-overlay">
           <div className="hero-content">
             <img
-              src={url("/headshot.jpg")}
+              src="/headshot.jpg"
               alt="Profile"
               className="profile-pic"
             />
