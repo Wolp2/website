@@ -3,16 +3,70 @@ import styles from "./Fitness.module.css";
 
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQZlEe5gpor6F0j6tRvsPrYhdrjOENGut0jUPdqTtyNYdefmRO72v1ogD9rLcUHN1HIJbMzkSfVNmRE/pub?gid=0&single=true&output=csv";
 
-/* Helpers */
-
 export default function Fitness() {
-  // state + effects + memo 
+  // ======= State =======
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [visibleSessions, setVisibleSessions] = useState(7);
   const [visibleRuns, setVisibleRuns] = useState(10);
 
+  // ======= Effects =======
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      setLoading(true);
+      setErr("");
+      try {
+        const res = await fetch(SHEET_URL, { cache: "no-store" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const txt = await res.text();
+        if (alive) setRows(parseCSV(txt));
+      } catch (e) {
+        console.error(e);
+        if (alive) setErr("Could not load training log.");
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  // ======= Memoized Data =======
+  const {
+    latestDate,
+    latestLifts,
+    latestTag,
+    latestRuns,
+    runTotalsLatest,
+    historyAll,
+    runsAll,
+  } = useMemo(() => {
+    if (!rows.length)
+      return {
+        latestDate: null,
+        latestLifts: [],
+        latestTag: "",
+        latestRuns: [],
+        runTotalsLatest: { miles: 0, minutes: 0, pace: null },
+        historyAll: [],
+        runsAll: [],
+      };
+
+    // parsing logic
+    
+    return {
+      latestDate,
+      latestLifts,
+      latestTag,
+      latestRuns,
+      runTotalsLatest,
+      historyAll,
+      runsAll,
+    };
+  }, [rows]);
+
+  // ======= Derived values =======
   const shownHistory = historyAll.slice(0, visibleSessions);
   const canShowMoreSessions = visibleSessions < historyAll.length;
   const shownRuns = runsAll.slice(0, visibleRuns);
