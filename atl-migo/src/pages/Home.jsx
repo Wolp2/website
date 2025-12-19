@@ -19,7 +19,7 @@ export default function Home() {
                 My name is William, I am a software engineer student and this is a personal project to share my work, ideas, and fitness journey.
               </p>
               <nav className="hero-nav">
-                <a href="/fitness">Fitness</a>
+                <a href="/Fitness">Fitness</a>
                 <a href="/photodump">Photo Dump</a>
               </nav>
             </div>
