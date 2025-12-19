@@ -4,6 +4,7 @@
   background:var(--bg);
   min-height:100dvh;
   color:var(--text);
+  padding-top: 42px;
 }
 
 .container { max-width:860px; margin:0 auto; padding:1rem clamp(1rem,3vw,1.25rem) 2rem; }

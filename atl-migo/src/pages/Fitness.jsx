@@ -10,20 +10,45 @@ const trim = (s) => (s ?? "").toString().trim();
 
 function parseCSV(text) {
   const rows = [];
-  let i = 0, cur = "", row = [], inQ = false;
+  let i = 0,
+    cur = "",
+    row = [],
+    inQ = false;
   while (i < text.length) {
     const ch = text[i];
     if (inQ) {
       if (ch === '"') {
-        if (text[i + 1] === '"') { cur += '"'; i += 2; }
-        else { inQ = false; i++; }
-      } else { cur += ch; i++; }
+        if (text[i + 1] === '"') {
+          cur += '"';
+          i += 2;
+        } else {
+          inQ = false;
+          i++;
+        }
+      } else {
+        cur += ch;
+        i++;
+      }
     } else {
-      if (ch === '"') { inQ = true; i++; }
-      else if (ch === ",") { row.push(cur); cur = ""; i++; }
-      else if (ch === "\n") { row.push(cur); rows.push(row); row = []; cur = ""; i++; }
-      else if (ch === "\r") { i++; }
-      else { cur += ch; i++; }
+      if (ch === '"') {
+        inQ = true;
+        i++;
+      } else if (ch === ",") {
+        row.push(cur);
+        cur = "";
+        i++;
+      } else if (ch === "\n") {
+        row.push(cur);
+        rows.push(row);
+        row = [];
+        cur = "";
+        i++;
+      } else if (ch === "\r") {
+        i++;
+      } else {
+        cur += ch;
+        i++;
+      }
     }
   }
   row.push(cur);
@@ -44,7 +69,13 @@ function parseMDY(str) {
 }
 
 const fmtDate = (d) =>
-  d ? d.toLocaleDateString(undefined, { month: "2-digit", day: "2-digit", year: "numeric" }) : "";
+  d
+    ? d.toLocaleDateString(undefined, {
+        month: "2-digit",
+        day: "2-digit",
+        year: "numeric",
+      })
+    : "";
 
 function paceFrom(distanceMiles, durationMin) {
   if (!distanceMiles || !durationMin) return null;
@@ -66,12 +97,18 @@ const toMinutes = (v) => {
   // mm:ss or hh:mm:ss
   if (s.includes(":")) {
     const parts = s.split(":").map((x) => parseFloat(x) || 0);
-    if (parts.length === 3) { const [hh, mm, ss] = parts; return hh * 60 + mm + ss / 60; }
-    const [mm, ss] = parts; return mm + ss / 60;
+    if (parts.length === 3) {
+      const [hh, mm, ss] = parts;
+      return hh * 60 + mm + ss / 60;
+    }
+    const [mm, ss] = parts;
+    return mm + ss / 60;
   }
 
   // words: "1h 5m 30s" or "29 minutes and 20 seconds"
-  const m = s.match(/(?:(\d+(?:\.\d+)?)\s*h(?:ours?)?)?\s*(?:(\d+(?:\.\d+)?)\s*m(?:in(?:ute)?s?)?)?\s*(?:(\d+(?:\.\d+)?)\s*s(?:ec(?:ond)?s?)?)?/);
+  const m = s.match(
+    /(?:(\d+(?:\.\d+)?)\s*h(?:ours?)?)?\s*(?:(\d+(?:\.\d+)?)\s*m(?:in(?:ute)?s?)?)?\s*(?:(\d+(?:\.\d+)?)\s*s(?:ec(?:ond)?s?)?)?/
+  );
   if (m) {
     const h = parseFloat(m[1] || 0);
     const min = parseFloat(m[2] || 0);
@@ -105,6 +142,41 @@ const col = (headers, names) => {
   return -1;
 };
 
+/* ================= Fitbit Banner ================= */
+function FitbitStatusBanner() {
+  const [fitbit, setFitbit] = useState({ connected: false, lastSyncTime: null });
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/fitbit/status");
+        const data = await res.json();
+        setFitbit(data);
+      } catch {
+        // If the endpoint fails, just show "not connected"
+        setFitbit({ connected: false, lastSyncTime: null });
+      }
+    })();
+  }, []);
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      {fitbit.connected ? (
+        <div>
+          ✅ Fitbit connected
+          {fitbit.lastSyncTime && (
+            <div>Last sync: {new Date(fitbit.lastSyncTime).toLocaleString()}</div>
+          )}
+        </div>
+      ) : (
+        <div>
+          ❌ Fitbit not connected — <a href="/fitbit/login">Connect</a>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ================= Component ================= */
 export default function Fitness() {
   // State
@@ -132,7 +204,9 @@ export default function Fitness() {
         if (alive) setLoading(false);
       }
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, []);
 
   // Transform data
@@ -161,46 +235,53 @@ export default function Fitness() {
 
     // Columns
     const cDate = col(headers, ["date"]);
-    const cCat  = col(headers, ["category", "tag", "focus", "split", "type"]);
-    const cEx   = col(headers, ["exercise"]);
-    const cWt   = col(headers, ["weight", "load", "lbs"]);
+    const cCat = col(headers, ["category", "tag", "focus", "split", "type"]);
+    const cEx = col(headers, ["exercise"]);
+    const cWt = col(headers, ["weight", "load", "lbs"]);
     const cSets = col(headers, ["sets"]);
     const cReps = col(headers, ["reps"]);
-    const cMi   = col(headers, ["distance (mi)", "distance mi", "miles"]);
-    const cMin  = col(headers, ["duration(min)", "duration (min)", "distance min", "minutes"]);
-    const cNotes= col(headers, ["notes", "comments", "note"]);
+    const cMi = col(headers, ["distance (mi)", "distance mi", "miles"]);
+    const cMin = col(headers, ["duration(min)", "duration (min)", "distance min", "minutes"]);
+    const cNotes = col(headers, ["notes", "comments", "note"]);
 
-    // Build entries
+    // Build entries (support repeated date/category rows)
     let curDate = null;
     let curCat = "";
     const entries = [];
+
     for (const r of body) {
       const dateCell = trim(r[cDate] ?? "");
-      const catCell  = trim(r[cCat]  ?? "");
+      const catCell = trim(r[cCat] ?? "");
       if (dateCell) curDate = parseMDY(dateCell) ?? curDate;
-      if (catCell)  curCat  = catCell;
+      if (catCell) curCat = catCell;
       if (!curDate) continue;
 
       const e = {
         date: curDate,
         category: curCat,
         exercise: trim(r[cEx] ?? ""),
-        weight:   trim(r[cWt] ?? ""),
-        sets:     trim(r[cSets] ?? ""),
-        reps:     trim(r[cReps] ?? ""),
-        miles:    trim(r[cMi] ?? ""),
-        minutes:  trim(r[cMin] ?? ""),
-        notes:    trim(r[cNotes] ?? ""),
+        weight: trim(r[cWt] ?? ""),
+        sets: trim(r[cSets] ?? ""),
+        reps: trim(r[cReps] ?? ""),
+        miles: trim(r[cMi] ?? ""),
+        minutes: trim(r[cMin] ?? ""),
+        notes: trim(r[cNotes] ?? ""),
       };
+
       if (e.exercise || e.weight || e.sets || e.reps || e.miles || e.minutes || e.notes) {
         entries.push(e);
       }
     }
+
     if (!entries.length)
       return {
-        latestDate: null, latestLifts: [], latestTag: "", latestRuns: [],
+        latestDate: null,
+        latestLifts: [],
+        latestTag: "",
+        latestRuns: [],
         runTotalsLatest: { miles: 0, minutes: 0, pace: null },
-        historyAll: [], runsAll: [],
+        historyAll: [],
+        runsAll: [],
       };
 
     // Group by date
@@ -224,19 +305,22 @@ export default function Fitness() {
 
     // Identify runs
     const isRun = (r) =>
-      (trim(r.miles) && trim(r.miles) !== "0") || (trim(r.minutes) && trim(r.minutes) !== "0");
+      (trim(r.miles) && trim(r.miles) !== "0") ||
+      (trim(r.minutes) && trim(r.minutes) !== "0");
 
-    const latestRuns  = latestRows.filter(isRun);
+    const latestRuns = latestRows.filter(isRun);
     const latestLifts = latestRows.filter((r) => !isRun(r) && r.exercise);
 
     // Totals for latest day (runs)
-    let miTotal = 0, minTotal = 0;
+    let miTotal = 0,
+      minTotal = 0;
     for (const r of latestRuns) {
       const d = parseFloat((r.miles || "").replace(/[^\d.]/g, ""));
       const m = toMinutes(r.minutes);
       if (!isNaN(d)) miTotal += d;
       if (!isNaN(m)) minTotal += m;
     }
+
     const runTotalsLatest = {
       miles: miTotal,
       minutes: minTotal,
@@ -250,9 +334,10 @@ export default function Fitness() {
       items: byDate.get(d.toDateString()),
     }));
 
-    // Flat runs list
+    // Flat runs list (newest→oldest by date)
     const runsAll = dates.flatMap((d) =>
-      byDate.get(d.toDateString())
+      byDate
+        .get(d.toDateString())
         .filter(isRun)
         .map((r) => ({ ...r, date: d }))
     );
@@ -277,6 +362,9 @@ export default function Fitness() {
   return (
     <main className={styles.fitnessWrap}>
       <section className={styles.container}>
+        {/* ✅ Fitbit status banner */}
+        <FitbitStatusBanner />
+
         <header className={styles.hero}>
           <h1>My Training Log</h1>
           <p className={styles.sub}>Live from Google Sheets — lifts + runs.</p>
@@ -356,7 +444,7 @@ export default function Fitness() {
                 </summary>
                 <div className={styles.historyItems}>
                   {h.items.map((it, j) =>
-                    (trim(it.miles) || trim(it.minutes)) ? (
+                    trim(it.miles) || trim(it.minutes) ? (
                       <RunCard key={j} item={it} compact />
                     ) : it.exercise ? (
                       <LiftCard key={j} item={it} compact />
@@ -417,8 +505,12 @@ function LiftCard({ item, compact }) {
         <h4 className={styles.title}>{item.exercise || "—"}</h4>
         {item.weight ? <span className={styles.pill}>{item.weight}</span> : null}
       </div>
-      <div className={styles.kv}><strong>Sets:</strong> {item.sets || "-"}</div>
-      <div className={styles.kv}><strong>Reps:</strong> {item.reps || "-"}</div>
+      <div className={styles.kv}>
+        <strong>Sets:</strong> {item.sets || "-"}
+      </div>
+      <div className={styles.kv}>
+        <strong>Reps:</strong> {item.reps || "-"}
+      </div>
     </div>
   );
 }
@@ -427,6 +519,7 @@ function RunCard({ item, compact }) {
   const dist = item.miles ? parseFloat(item.miles.replace(/[^\d.]/g, "")) : null;
   const mins = item.minutes ? toMinutes(item.minutes) : null;
   const pace = dist && mins ? paceFrom(dist, mins) : null;
+
   return (
     <div className={`${styles.card} ${compact ? styles.compact : ""}`}>
       <div className={styles.kv}>
@@ -434,7 +527,11 @@ function RunCard({ item, compact }) {
         {mins ? ` · ${formatDuration(mins)}` : ""}
         {pace ? ` · ${pace}` : ""}
       </div>
-      {item.notes && <div className={styles.kv} style={{ color: "#64748b" }}>{item.notes}</div>}
+      {item.notes && (
+        <div className={styles.kv} style={{ color: "#64748b" }}>
+          {item.notes}
+        </div>
+      )}
     </div>
   );
 }
