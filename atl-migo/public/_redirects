@@ -1,3 +1,4 @@
-/fitness     /index.html   200
-/fitness/*   /index.html   200
-/*           /index.html   200
+/fitbit/*   /fitbit/:splat   200
+/fitness    /index.html      200
+/fitness/*  /index.html      200
+/*          /index.html      200

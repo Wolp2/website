@@ -41,7 +41,6 @@ export async function onRequestGet({ env, request }) {
     obtained_at: Date.now()
   }));
 
-  // ✅ absolute redirect
   const home = new URL("/", env.APP_BASE_URL).toString();
   return Response.redirect(home, 302);
 }

@@ -1,7 +1,6 @@
 export async function onRequestGet({ env, request }) {
   const url = new URL(request.url);
 
-  // simple CSRF protection "state"
   const state = crypto.randomUUID();
   await env.FITBIT_KV.put("oauth_state", state, { expirationTtl: 600 });
 
