@@ -41,6 +41,11 @@ export async function onRequestGet({ env, request }) {
     obtained_at: Date.now()
   }));
 
-  const home = new URL("/", env.APP_BASE_URL).toString();
-  return Response.redirect(home, 302);
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: new URL("/fitness", env.APP_BASE_URL).toString(),
+      "Set-Cookie": "fitbit=1; Path=/; Secure; HttpOnly; SameSite=Lax"
+    }
+  });
 }
