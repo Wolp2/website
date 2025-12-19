@@ -1,5 +1,4 @@
 async function refreshIfNeeded(env, tokens) {
-  // If you want to be safe, refresh when token is close to expiring.
   const expiresMs = (tokens.expires_in ?? 0) * 1000;
   const age = Date.now() - (tokens.obtained_at ?? 0);
   const shouldRefresh = !tokens.access_token || (expiresMs && age > (expiresMs - 60_000));
