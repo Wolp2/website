@@ -280,7 +280,8 @@ export default function Fitness() {
 
   // UI
   const [selectedISO, setSelectedISO] = useState(() => new Date().toISOString().slice(0, 10));
-  const [rangeDays, setRangeDays] = useState(30);
+  // ✅ Default to DAILY (no range fetch on first load)
+  const [rangeDays, setRangeDays] = useState("daily"); // "daily" | 7 | 30 | 90
   const [metric, setMetric] = useState("steps"); // steps | caloriesOut | restingHeartRate
   const [workoutsOpen, setWorkoutsOpen] = useState(false);
 
@@ -361,7 +362,7 @@ export default function Fitness() {
     return map;
   }, [rows]);
 
-  // Load Fitbit day summary for selected date
+  // Load Fitbit day summary for selected date (runs on page load)
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -392,9 +393,18 @@ export default function Fitness() {
     };
   }, [selectedISO]);
 
-  // Load Fitbit range for chart
+  // Load Fitbit range for chart ONLY when user selects 7/30/90 (not on initial load)
   useEffect(() => {
     let alive = true;
+
+    // ✅ daily mode = don't fetch range
+    if (rangeDays === "daily") {
+      setFitbitRange([]);
+      return () => {
+        alive = false;
+      };
+    }
+
     (async () => {
       try {
         const r = await fetch(`${FITBIT_API}/fitbit/range?days=${encodeURIComponent(rangeDays)}`, {
@@ -409,6 +419,7 @@ export default function Fitness() {
         if (alive) setFitbitRange([]);
       }
     })();
+
     return () => {
       alive = false;
     };
@@ -439,7 +450,7 @@ export default function Fitness() {
   const metricLabel =
     metric === "steps" ? "Steps" : metric === "caloriesOut" ? "Calories Out" : "Resting HR";
 
-  // If HR is null across the entire range, chart looks flat; that's okay.
+  // Chart data only exists when range is selected
   const chartData = fitbitRange;
 
   return (
@@ -449,14 +460,20 @@ export default function Fitness() {
 
         <header className={styles.hero}>
           <h1>Fitness Dashboard</h1>
-          <p className={styles.sub}>
-            Fitbit daily stats + your logged workouts (Google Sheets).
-          </p>
+          <p className={styles.sub}>Fitbit daily stats + your logged workouts (Google Sheets).</p>
         </header>
 
         {/* Controls */}
         <section className={styles.panel}>
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "end", justifyContent: "space-between" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 12,
+              flexWrap: "wrap",
+              alignItems: "end",
+              justifyContent: "space-between",
+            }}
+          >
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "end" }}>
               <label style={{ display: "grid", gap: 6 }}>
                 <span style={{ fontSize: 12, opacity: 0.7 }}>Date</span>
@@ -471,14 +488,19 @@ export default function Fitness() {
               <label style={{ display: "grid", gap: 6 }}>
                 <span style={{ fontSize: 12, opacity: 0.7 }}>Chart range</span>
                 <select
-                  value={rangeDays}
-                  onChange={(e) => setRangeDays(clamp(parseInt(e.target.value, 10), 7, 180))}
+                  value={String(rangeDays)}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "daily") return setRangeDays("daily");
+                    const n = clamp(parseInt(v, 10), 7, 90);
+                    setRangeDays(n);
+                  }}
                   style={{ padding: 10, borderRadius: 12, border: "1px solid rgba(0,0,0,0.15)" }}
                 >
+                  <option value="daily">Daily stats (default)</option>
                   <option value={7}>Last 7 days</option>
                   <option value={30}>Last 30 days</option>
                   <option value={90}>Last 90 days</option>
-                  <option value={180}>Last 180 days</option>
                 </select>
               </label>
 
@@ -515,7 +537,14 @@ export default function Fitness() {
           {!!fitbitErr && <div className={`${styles.info} ${styles.error}`}>{fitbitErr}</div>}
 
           {!fitbitErr && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12, marginTop: 12 }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                gap: 12,
+                marginTop: 12,
+              }}
+            >
               <StatCard label="Steps" value={fitbitDay?.steps ?? "—"} />
               <StatCard label="Calories Out" value={fitbitDay?.caloriesOut ?? "—"} />
               <StatCard
@@ -528,13 +557,27 @@ export default function Fitness() {
 
           {/* Chart */}
           <div style={{ marginTop: 14 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "baseline",
+                gap: 12,
+                flexWrap: "wrap",
+              }}
+            >
               <h3 style={{ margin: 0 }}>{metricLabel} Trend</h3>
-              <span style={{ fontSize: 12, opacity: 0.7 }}>{rangeDays} days</span>
+              <span style={{ fontSize: 12, opacity: 0.7 }}>
+                {rangeDays === "daily" ? "daily stats" : `${rangeDays} days`}
+              </span>
             </div>
 
             <div style={{ marginTop: 10 }}>
-              {chartData.length ? (
+              {rangeDays === "daily" ? (
+                <div className={styles.info}>
+                  Select 7 / 30 / 90 days to load a trend chart. (Daily stats are shown above by default.)
+                </div>
+              ) : chartData.length ? (
                 <MiniLineChart data={chartData} valueKey={metric} />
               ) : (
                 <div className={styles.info}>No chart data yet.</div>
@@ -543,13 +586,19 @@ export default function Fitness() {
           </div>
         </section>
 
-        {/* Workouts (small footprint) */}
+        {/* Workouts */}
         <section className={styles.panel} style={{ marginTop: 14 }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
             <div>
               <h2 style={{ margin: 0 }}>Workouts — {fmtDatePretty(selectedISO)}</h2>
               <div style={{ fontSize: 13, opacity: 0.75, marginTop: 4 }}>
-                {loadingSheet ? "Loading training log…" : sheetErr ? sheetErr : hasWorkout ? "Workout logged" : "No workout logged"}
+                {loadingSheet
+                  ? "Loading training log…"
+                  : sheetErr
+                  ? sheetErr
+                  : hasWorkout
+                  ? "Workout logged"
+                  : "No workout logged"}
               </div>
             </div>
 
