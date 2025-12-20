@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import styles from "./Fitness.module.css";
+import FitbitTrendCharts from "../components/FitbitTrendCharts";
 
 /** ===== External Sources ===== */
 const SHEET_URL =
@@ -99,6 +100,86 @@ function clamp(n, a, b) {
   return Math.max(a, Math.min(b, n));
 }
 
+const parseWeightLbs = (w) => {
+  const n = parseFloat(String(w || "").replace(/[^\d.]/g, ""));
+  return Number.isFinite(n) ? n : null;
+};
+
+const bestWeightInHistory = (hist) => {
+  let best = null;
+  for (const it of hist || []) {
+    const w = parseWeightLbs(it?.weight);
+    if (w == null) continue;
+    best = best == null ? w : Math.max(best, w);
+  }
+  return best;
+};
+
+const normalizeExerciseName = (name) => {
+  let s = trim(name).toLowerCase();
+  s = s.replace(/\s+/g, " ");
+  s = s.replace(/benchpress/g, "bench press");
+  s = s.replace(/\s+at home\b/g, "");
+  return s.replace(/\b\w/g, (c) => c.toUpperCase());
+};
+
+const normalizeSplit = (category, exerciseName) => {
+  const cat = trim(category).toLowerCase();
+  const ex = trim(exerciseName).toLowerCase();
+  if (ex.includes("back extension") || ex.includes("hyperextension")) return "pull";
+  if (cat.includes("push")) return "push";
+  if (cat.includes("pull")) return "pull";
+  if (cat.includes("leg")) return "legs";
+
+  if (
+    ex.includes("squat") ||
+    ex.includes("lunge") ||
+    ex.includes("deadlift") ||
+    ex.includes("romanian") ||
+    ex.includes("rdl") ||
+    ex.includes("leg press") ||
+    ex.includes("leg extension") ||
+    ex.includes("leg curl") ||
+    ex.includes("calf") ||
+    ex.includes("glute") ||
+    ex.includes("hamstring") ||
+    ex.includes("quad") ||
+    ex.includes("hip thrust")
+  )
+    return "legs";
+
+  if (
+    ex.includes("row") ||
+    ex.includes("pulldown") ||
+    ex.includes("pull up") ||
+    ex.includes("pullup") ||
+    ex.includes("lat") ||
+    ex.includes("face pull") ||
+    ex.includes("rear delt") ||
+    ex.includes("shrug") ||
+    ex.includes("curl")
+  )
+    return "pull";
+
+  if (
+    ex.includes("bench") ||
+    ex.includes("incline") ||
+    ex.includes("press") ||
+    ex.includes("overhead") ||
+    ex.includes("chest") ||
+    ex.includes("fly") ||
+    ex.includes("dips") ||
+    ex.includes("skull crusher") ||
+    ex.includes("lateral raise") ||
+    ex.includes("tricep")
+  )
+    return "push";
+
+  return "other";
+};
+
+const splitLabel = (k) => (k === "push" ? "Push" : k === "pull" ? "Pull" : k === "legs" ? "Legs" : "Other");
+
 /* ================= Fitbit Status Banner ================= */
 function FitbitStatusBanner() {
   const [fitbit, setFitbit] = useState({ connected: false, lastSyncTime: null, hasKV: false });
@@ -125,54 +206,12 @@ function FitbitStatusBanner() {
         <div className={styles.statusOk}>
           ✅ Fitbit connected
           {fitbit.lastSyncTime && (
-            <div className={styles.statusSub}>
-              Last token refresh: {new Date(fitbit.lastSyncTime).toLocaleString()}
-            </div>
+            <div className={styles.statusSub}>Last token refresh: {new Date(fitbit.lastSyncTime).toLocaleString()}</div>
           )}
         </div>
       ) : (
         <div className={styles.statusBad}>❌ Fitbit not connected</div>
       )}
-    </div>
-  );
-}
-
-/* ================= Simple SVG Line Chart ================= */
-function MiniLineChart({ data, valueKey, height = 180 }) {
-  const w = 720;
-  const h = height;
-  const pad = 16;
-
-  const values = data.map((d) => (d?.[valueKey] == null ? 0 : Number(d[valueKey]) || 0));
-  const max = Math.max(1, ...values);
-  const min = Math.min(...values);
-
-  const toX = (i) => {
-    if (data.length <= 1) return pad;
-    return pad + (i * (w - pad * 2)) / (data.length - 1);
-  };
-
-  const toY = (v) => {
-    const range = Math.max(1e-9, max - min);
-    const t = (v - min) / range;
-    return h - pad - t * (h - pad * 2);
-  };
-
-  const pts = values.map((v, i) => `${toX(i)},${toY(v)}`).join(" ");
-  const last = data[data.length - 1];
-  const lastVal = last?.[valueKey];
-
-  return (
-    <div className={styles.chartWrap}>
-      <svg viewBox={`0 0 ${w} ${h}`} width="100%" height={h} role="img" aria-label="chart">
-        <line x1={pad} y1={h - pad} x2={w - pad} y2={h - pad} stroke="currentColor" opacity="0.12" />
-        <polyline fill="none" stroke="currentColor" strokeWidth="3" points={pts} opacity="0.9" />
-      </svg>
-      <div className={styles.chartFooter}>
-        <span>{data[0]?.date ?? "—"}</span>
-        <span>Latest: {lastVal == null ? "—" : lastVal}</span>
-        <span>{data[data.length - 1]?.date ?? "—"}</span>
-      </div>
     </div>
   );
 }
@@ -194,10 +233,13 @@ export default function Fitness() {
   const [selectedISO, setSelectedISO] = useState(() => new Date().toISOString().slice(0, 10));
   const [rangeDays, setRangeDays] = useState("daily"); // "daily" | 7 | 30 | 90
   const [metric, setMetric] = useState("steps"); // steps | caloriesOut | restingHeartRate
-  const [historyDays, setHistoryDays] = useState(30);
 
-  const metricLabel =
-    metric === "steps" ? "Steps" : metric === "caloriesOut" ? "Calories Out" : "Resting HR";
+  // Exercise progress UI
+  const [exerciseQuery, setExerciseQuery] = useState("");
+  const [selectedExercise, setSelectedExercise] = useState("");
+  const [splitFilter, setSplitFilter] = useState("all"); // all | push | pull | legs | other
+
+  const metricLabel = metric === "steps" ? "Steps" : metric === "caloriesOut" ? "Calories Out" : "Resting HR";
 
   // Load Sheets CSV
   useEffect(() => {
@@ -222,7 +264,7 @@ export default function Fitness() {
     };
   }, []);
 
-  // Build workouts grouped by ISO date from Sheets (LIFTS ONLY)
+  // Build lifts grouped by ISO date from Sheets (LIFTS ONLY)
   const liftsByISO = useMemo(() => {
     if (!rows.length) return new Map();
 
@@ -250,15 +292,16 @@ export default function Fitness() {
       if (catCell) curCat = catCell;
       if (!curDate) continue;
 
-      const exercise = trim(r[cEx] ?? "");
+      const exerciseRaw = trim(r[cEx] ?? "");
       const miles = trim(r[cMi] ?? "");
       const minutes = trim(r[cMin] ?? "");
 
-      // Only keep lift rows (exercise exists AND not a run row)
-      if (!exercise) continue;
+      if (!exerciseRaw) continue;
       if (miles || minutes) continue;
 
-      const e = {
+      const exercise = normalizeExerciseName(exerciseRaw);
+
+      entries.push({
         date: curDate,
         iso: toISODateLocal(curDate),
         category: curCat,
@@ -267,9 +310,7 @@ export default function Fitness() {
         sets: trim(r[cSets] ?? ""),
         reps: trim(r[cReps] ?? ""),
         notes: trim(r[cNotes] ?? ""),
-      };
-
-      entries.push(e);
+      });
     }
 
     const map = new Map();
@@ -278,7 +319,6 @@ export default function Fitness() {
       map.get(e.iso).push(e);
     }
 
-    // Sort each day's lifts in a stable way (exercise name)
     for (const [k, arr] of map.entries()) {
       arr.sort((a, b) => (a.exercise || "").localeCompare(b.exercise || ""));
       map.set(k, arr);
@@ -286,6 +326,65 @@ export default function Fitness() {
 
     return map;
   }, [rows]);
+
+  // Exercise index: exerciseName -> entries sorted newest first
+  const exerciseIndex = useMemo(() => {
+    const map = new Map();
+    for (const [iso, lifts] of liftsByISO.entries()) {
+      for (const it of lifts) {
+        const name = trim(it.exercise);
+        if (!name) continue;
+        if (!map.has(name)) map.set(name, []);
+        map.get(name).push({ ...it, iso });
+      }
+    }
+
+    for (const [name, arr] of map.entries()) {
+      arr.sort((a, b) => b.iso.localeCompare(a.iso));
+      map.set(name, arr);
+    }
+
+    return map;
+  }, [liftsByISO]);
+
+  // Group exercises by split based on most-recent entry's category
+  const exerciseGroups = useMemo(() => {
+    const baseNames = Array.from(exerciseIndex.keys());
+
+    const filtered = !exerciseQuery
+      ? baseNames
+      : baseNames.filter((n) => n.toLowerCase().includes(exerciseQuery.toLowerCase()));
+
+    filtered.sort((a, b) => {
+      const aIso = exerciseIndex.get(a)?.[0]?.iso || "0000-00-00";
+      const bIso = exerciseIndex.get(b)?.[0]?.iso || "0000-00-00";
+      return bIso.localeCompare(aIso);
+    });
+
+    const groups = { push: [], pull: [], legs: [], other: [] };
+
+    for (const name of filtered) {
+      const last = exerciseIndex.get(name)?.[0];
+      const split = normalizeSplit(last?.category, name);
+      (groups[split] ?? groups.other).push(name);
+    }
+
+    return groups;
+  }, [exerciseIndex, exerciseQuery]);
+
+  const exerciseNames = useMemo(() => {
+    return [...exerciseGroups.push, ...exerciseGroups.pull, ...exerciseGroups.legs, ...exerciseGroups.other];
+  }, [exerciseGroups]);
+
+  const selectedExerciseHistory = useMemo(() => {
+    if (!selectedExercise) return [];
+    return exerciseIndex.get(selectedExercise) ?? [];
+  }, [exerciseIndex, selectedExercise]);
+
+  useEffect(() => {
+    if (!selectedExercise && exerciseNames.length) setSelectedExercise(exerciseNames[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exerciseNames.length]);
 
   // Load Fitbit day summary for selected date
   useEffect(() => {
@@ -331,9 +430,7 @@ export default function Fitness() {
 
     (async () => {
       try {
-        const r = await fetch(`${FITBIT_API}/fitbit/range?days=${encodeURIComponent(rangeDays)}`, {
-          cache: "no-store",
-        });
+        const r = await fetch(`${FITBIT_API}/fitbit/range?days=${encodeURIComponent(rangeDays)}`, { cache: "no-store" });
         const text = await r.text();
         if (!r.ok) throw new Error(text);
         const payload = JSON.parse(text);
@@ -349,15 +446,22 @@ export default function Fitness() {
     };
   }, [rangeDays]);
 
-  // Selected day lifts
+  const trendData = useMemo(() => {
+    // fitbitRange items have keys: date, steps, caloriesOut, restingHeartRate...
+    const key = metric;
+    return (fitbitRange ?? []).map((d) => ({
+      date: d.date,
+      value: Number(d?.[key] ?? 0),
+    }));
+  }, [fitbitRange, metric]);
+
   const selectedLifts = liftsByISO.get(selectedISO) ?? [];
 
-  // History list (recent days with lifts)
-  const historyList = useMemo(() => {
-    const allDays = Array.from(liftsByISO.keys()).sort((a, b) => b.localeCompare(a)); // newest first
-    const limited = allDays.slice(0, clamp(historyDays, 1, 365));
-    return limited.map((iso) => ({ iso, lifts: liftsByISO.get(iso) ?? [] }));
-  }, [liftsByISO, historyDays]);
+  const goal = useMemo(() => {
+    if (metric === "steps") return 10000;
+    // goals for other metrics can be added later
+    return null;
+  }, [metric]);
 
   return (
     <main className={styles.fitnessWrap}>
@@ -375,12 +479,7 @@ export default function Fitness() {
             <div className={styles.controlsGroup}>
               <label className={styles.field}>
                 <span className={styles.fieldLabel}>Date</span>
-                <input
-                  className={styles.input}
-                  type="date"
-                  value={selectedISO}
-                  onChange={(e) => setSelectedISO(e.target.value)}
-                />
+                <input className={styles.input} type="date" value={selectedISO} onChange={(e) => setSelectedISO(e.target.value)} />
               </label>
 
               <label className={styles.field}>
@@ -412,16 +511,13 @@ export default function Fitness() {
               </label>
             </div>
 
-            <button
-              className={styles.btn}
-              onClick={() => setSelectedISO(new Date().toISOString().slice(0, 10))}
-            >
+            <button className={styles.btn} onClick={() => setSelectedISO(new Date().toISOString().slice(0, 10))}>
               Jump to Today
             </button>
           </div>
         </section>
 
-        {/* ===== Tiles (Fitbit) ===== */}
+        {/* Tiles */}
         <section className={styles.tileGrid}>
           <Tile title="Steps" value={fitbitDay?.steps ?? "—"} sub={fmtDatePretty(selectedISO)} />
           <Tile title="Calories Out" value={fitbitDay?.caloriesOut ?? "—"} sub={fmtDatePretty(selectedISO)} />
@@ -432,38 +528,32 @@ export default function Fitness() {
           />
         </section>
 
-        {/* ===== Fitbit Chart + Errors ===== */}
+        {/* Fitbit Chart */}
         <section className={styles.panel} style={{ marginTop: 14 }}>
           <div className={styles.sectionHead}>
             <h2 className={styles.sectionTitle}>Fitbit Trend</h2>
-            <div className={styles.sectionMeta}>
-              {fitbitLoading ? "Loading daily summary…" : fmtDatePretty(selectedISO)}
-            </div>
+            <div className={styles.sectionMeta}>{fitbitLoading ? "Loading daily summary…" : fmtDatePretty(selectedISO)}</div>
           </div>
 
           {!!fitbitErr && <div className={`${styles.info} ${styles.error}`}>{fitbitErr}</div>}
 
           <div className={styles.chartHead}>
             <h3 className={styles.chartTitle}>{metricLabel}</h3>
-            <span className={styles.chartMeta}>
-              {rangeDays === "daily" ? "Daily stats shown above" : `${rangeDays} days`}
-            </span>
+            <span className={styles.chartMeta}>{rangeDays === "daily" ? "Daily stats shown above" : `${rangeDays} days`}</span>
           </div>
 
           <div className={styles.chartBox}>
             {rangeDays === "daily" ? (
-              <div className={styles.info}>
-                Select 7 / 30 / 90 days to load a trend chart. (Daily stats are shown above by default.)
-              </div>
-            ) : fitbitRange.length ? (
-              <MiniLineChart data={fitbitRange} valueKey={metric} />
+              <div className={styles.info}>Select 7 / 30 / 90 days to load a trend chart. (Daily stats are shown above by default.)</div>
+            ) : trendData.length ? (
+              <FitbitTrendCharts title={metricLabel} data={trendData} rangeDays={Number(rangeDays)} goal={goal} trendWindow={14} />
             ) : (
               <div className={styles.info}>No chart data yet.</div>
             )}
           </div>
         </section>
 
-        {/* ===== Lifts (Selected Date) ===== */}
+        {/* Lifts for selected day */}
         <section className={styles.panel} style={{ marginTop: 14 }}>
           <div className={styles.sectionHead}>
             <h2 className={styles.sectionTitle}>Lifts — {fmtDatePretty(selectedISO)}</h2>
@@ -474,9 +564,7 @@ export default function Fitness() {
 
           {sheetErr ? <div className={`${styles.info} ${styles.error}`}>{sheetErr}</div> : null}
 
-          {!sheetErr && !loadingSheet && selectedLifts.length === 0 ? (
-            <div className={styles.info}>No lifts logged for this date.</div>
-          ) : null}
+          {!sheetErr && !loadingSheet && selectedLifts.length === 0 ? <div className={styles.info}>No lifts logged for this date.</div> : null}
 
           {!sheetErr && selectedLifts.length > 0 ? (
             <div className={styles.liftGrid}>
@@ -487,68 +575,151 @@ export default function Fitness() {
           ) : null}
         </section>
 
-        {/* ===== Lift History ===== */}
+        {/* Progress by Exercise */}
         <section className={styles.panel} style={{ marginTop: 14 }}>
           <div className={styles.sectionHead}>
-            <h2 className={styles.sectionTitle}>Lift History</h2>
-            <div className={styles.sectionMeta}>Browse prior days from Sheets</div>
+            <h2 className={styles.sectionTitle}>Progress by Exercise</h2>
+            <div className={styles.sectionMeta}>Pick an exercise to see your history</div>
           </div>
 
-          <div className={styles.historyBar}>
+          <div className={styles.exerciseBar}>
             <label className={styles.field}>
-              <span className={styles.fieldLabel}>Show last</span>
-              <select
-                className={styles.select}
-                value={historyDays}
-                onChange={(e) => setHistoryDays(clamp(parseInt(e.target.value, 10) || 30, 1, 365))}
-              >
-                <option value={7}>7 days</option>
-                <option value={30}>30 days</option>
-                <option value={90}>90 days</option>
-                <option value={180}>180 days</option>
-                <option value={365}>365 days</option>
+              <span className={styles.fieldLabel}>Search</span>
+              <input className={styles.input} value={exerciseQuery} onChange={(e) => setExerciseQuery(e.target.value)} placeholder="bench, incline, squat..." />
+            </label>
+
+            <div className={styles.splitTabs}>
+              <button type="button" className={`${styles.tabBtn} ${splitFilter === "all" ? styles.tabBtnActive : ""}`} onClick={() => setSplitFilter("all")}>
+                All
+              </button>
+              <button type="button" className={`${styles.tabBtn} ${splitFilter === "push" ? styles.tabBtnActive : ""}`} onClick={() => setSplitFilter("push")}>
+                Push
+              </button>
+              <button type="button" className={`${styles.tabBtn} ${splitFilter === "pull" ? styles.tabBtnActive : ""}`} onClick={() => setSplitFilter("pull")}>
+                Pull
+              </button>
+              <button type="button" className={`${styles.tabBtn} ${splitFilter === "legs" ? styles.tabBtnActive : ""}`} onClick={() => setSplitFilter("legs")}>
+                Legs
+              </button>
+              <button type="button" className={`${styles.tabBtn} ${splitFilter === "other" ? styles.tabBtnActive : ""}`} onClick={() => setSplitFilter("other")}>
+                Other
+              </button>
+            </div>
+
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>Exercise</span>
+              <select className={styles.select} value={selectedExercise} onChange={(e) => setSelectedExercise(e.target.value)}>
+                {exerciseNames.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
               </select>
             </label>
 
-            <button className={styles.btn} onClick={() => setSelectedISO(new Date().toISOString().slice(0, 10))}>
-              Today
+            <button
+              className={styles.btn}
+              onClick={() => {
+                const first = selectedExerciseHistory[0];
+                if (first?.iso) setSelectedISO(first.iso);
+              }}
+              disabled={!selectedExerciseHistory.length}
+              title="Jump date picker to most recent entry"
+            >
+              Jump to Latest
             </button>
           </div>
 
-          {loadingSheet ? (
-            <div className={styles.info}>Loading history…</div>
-          ) : sheetErr ? (
-            <div className={`${styles.info} ${styles.error}`}>{sheetErr}</div>
-          ) : historyList.length === 0 ? (
-            <div className={styles.info}>No lift history found yet.</div>
-          ) : (
-            <div className={styles.historyList}>
-              {historyList.map(({ iso, lifts }) => (
-                <details key={iso} className={styles.historyDay}>
-                  <summary className={styles.historySummary}>
-                    <span className={styles.historyDate}>{fmtDatePretty(iso)}</span>
-                    <span className={styles.historyCount}>{lifts.length} lifts</span>
-                    <button
-                      className={styles.linkBtn}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setSelectedISO(iso);
-                      }}
-                      title="Jump to this date"
-                    >
-                      View
-                    </button>
-                  </summary>
+          {(() => {
+            const groupsToShow = splitFilter === "all" ? ["push", "pull", "legs", "other"] : [splitFilter];
 
-                  <div className={styles.historyItems}>
-                    {lifts.map((it, idx) => (
-                      <LiftRow key={`${iso}-${idx}`} item={it} compact />
-                    ))}
-                  </div>
-                </details>
-              ))}
+            return (
+              <div className={styles.splitSections}>
+                {groupsToShow.map((g) => {
+                  const list = exerciseGroups[g] ?? [];
+                  if (!list.length) return null;
+
+                  return (
+                    <div key={g} className={styles.splitSection}>
+                      <div className={styles.splitHeader}>
+                        <h3 className={styles.splitTitle}>{splitLabel(g)}</h3>
+                        <span className={styles.splitCount}>{list.length} exercises</span>
+                      </div>
+
+                      <div className={styles.exerciseGrid}>
+                        {list.slice(0, 18).map((name) => {
+                          const hist = exerciseIndex.get(name) ?? [];
+                          const last = hist[0];
+                          const best = bestWeightInHistory(hist);
+
+                          return (
+                            <button
+                              key={name}
+                              type="button"
+                              className={`${styles.exerciseCard} ${name === selectedExercise ? styles.exerciseCardActive : ""}`}
+                              onClick={() => setSelectedExercise(name)}
+                            >
+                              <div className={styles.exerciseName}>{name}</div>
+
+                              <div className={styles.exerciseLast}>
+                                <span className={styles.muted}>{last?.iso ? fmtDatePretty(last.iso) : "—"}</span>
+
+                                <div className={styles.badgeRow}>
+                                  {last?.weight ? <span className={styles.pill}>Last: {last.weight}</span> : null}
+                                  {best != null ? <span className={styles.pillAlt}>Best: {best} lb</span> : null}
+                                </div>
+                              </div>
+
+                              <div className={styles.exerciseMeta}>Sets: {last?.sets || "-"} • Reps: {last?.reps || "-"}</div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+
+          <div className={styles.tableWrap}>
+            <div className={styles.tableHead}>
+              <h3 className={styles.chartTitle} style={{ margin: 0 }}>
+                {selectedExercise || "Select an exercise"}
+              </h3>
+              <span className={styles.chartMeta}>{selectedExerciseHistory.length ? `${selectedExerciseHistory.length} entries` : "No entries"}</span>
             </div>
-          )}
+
+            {selectedExerciseHistory.length ? (
+              <div className={styles.table}>
+                <div className={`${styles.tr} ${styles.th}`}>
+                  <div>Date</div>
+                  <div>Weight</div>
+                  <div>Sets</div>
+                  <div>Reps</div>
+                  <div>Notes</div>
+                  <div></div>
+                </div>
+
+                {selectedExerciseHistory.slice(0, 40).map((it, idx) => (
+                  <div key={`${it.iso}-${idx}`} className={styles.tr}>
+                    <div>{fmtDatePretty(it.iso)}</div>
+                    <div>{it.weight || "—"}</div>
+                    <div>{it.sets || "—"}</div>
+                    <div>{it.reps || "—"}</div>
+                    <div className={styles.notesCell}>{it.notes || ""}</div>
+                    <div>
+                      <button className={styles.linkBtn} onClick={() => setSelectedISO(it.iso)}>
+                        View day
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className={styles.info}>No history for this exercise yet.</div>
+            )}
+          </div>
         </section>
 
         <footer className={styles.siteFoot}>© {new Date().getFullYear()} William Lopez</footer>
@@ -558,7 +729,6 @@ export default function Fitness() {
 }
 
 /* ---------- UI Pieces ---------- */
-
 function Tile({ title, value, sub }) {
   return (
     <div className={styles.tile}>
