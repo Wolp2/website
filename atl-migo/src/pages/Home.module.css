@@ -1,6 +1,6 @@
 .hero {
   position: relative;
-  height: 60vh;
+  height: 100vh;
   background: url("/halloween.jpg") center/cover no-repeat;
   display: flex;
   align-items: center;
