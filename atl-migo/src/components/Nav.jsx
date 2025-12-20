@@ -26,7 +26,6 @@ export default function Nav() {
     >
       <NavLink to="/" style={link}>Home</NavLink>
       <NavLink to="/fitness" style={link}>Fitness</NavLink>
-      <NavLink to="/photodump" style={link}>Photo Dump</NavLink>
     </nav>
   );
 }

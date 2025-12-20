@@ -20,7 +20,6 @@ export default function Home() {
               </p>
               <nav className="hero-nav">
                 <a href="/Fitness">Fitness</a>
-                <a href="/photodump">Photo Dump</a>
               </nav>
             </div>
           </div>

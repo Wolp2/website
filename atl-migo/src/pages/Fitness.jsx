@@ -95,54 +95,6 @@ const col = (headers, names) => {
   return -1;
 };
 
-function paceFrom(distanceMiles, durationMin) {
-  if (!distanceMiles || !durationMin) return null;
-  const pace = durationMin / distanceMiles;
-  const m = Math.floor(pace);
-  const s = Math.round((pace - m) * 60);
-  return `${m}:${String(s).padStart(2, "0")}/mi`;
-}
-
-const toMinutes = (v) => {
-  if (v == null) return 0;
-  if (typeof v === "number") return v;
-
-  const s = String(v).trim().toLowerCase();
-
-  if (/^\d+(\.\d+)?$/.test(s)) return parseFloat(s);
-
-  if (s.includes(":")) {
-    const parts = s.split(":").map((x) => parseFloat(x) || 0);
-    if (parts.length === 3) {
-      const [hh, mm, ss] = parts;
-      return hh * 60 + mm + ss / 60;
-    }
-    const [mm, ss] = parts;
-    return mm + ss / 60;
-  }
-
-  const m = s.match(
-    /(?:(\d+(?:\.\d+)?)\s*h(?:ours?)?)?\s*(?:(\d+(?:\.\d+)?)\s*m(?:in(?:ute)?s?)?)?\s*(?:(\d+(?:\.\d+)?)\s*s(?:ec(?:ond)?s?)?)?/
-  );
-  if (m) {
-    const h = parseFloat(m[1] || 0);
-    const min = parseFloat(m[2] || 0);
-    const sec = parseFloat(m[3] || 0);
-    if (h || min || sec) return h * 60 + min + sec / 60;
-  }
-
-  return 0;
-};
-
-const formatDuration = (minutesFloat) => {
-  const totalSeconds = Math.round(minutesFloat * 60);
-  const mm = Math.floor(totalSeconds / 60);
-  const ss = totalSeconds % 60;
-  if (ss === 0) return `${mm} min`;
-  if (mm === 0) return `${ss} sec`;
-  return `${mm}m ${ss}s`;
-};
-
 function clamp(n, a, b) {
   return Math.max(a, Math.min(b, n));
 }
@@ -168,30 +120,30 @@ function FitbitStatusBanner() {
   }, []);
 
   return (
-    <div style={{ marginBottom: 12 }}>
+    <div className={styles.statusBanner}>
       {fitbit.connected ? (
-        <div>
+        <div className={styles.statusOk}>
           ✅ Fitbit connected
           {fitbit.lastSyncTime && (
-            <div style={{ opacity: 0.75, fontSize: 13 }}>
+            <div className={styles.statusSub}>
               Last token refresh: {new Date(fitbit.lastSyncTime).toLocaleString()}
             </div>
           )}
         </div>
       ) : (
-        <div>❌ Fitbit not connected</div>
+        <div className={styles.statusBad}>❌ Fitbit not connected</div>
       )}
     </div>
   );
 }
 
 /* ================= Simple SVG Line Chart ================= */
-function MiniLineChart({ data, valueKey, height = 140 }) {
+function MiniLineChart({ data, valueKey, height = 180 }) {
   const w = 720;
   const h = height;
-  const pad = 14;
+  const pad = 16;
 
-  const values = data.map((d) => (d?.[valueKey] == null ? 0 : d[valueKey]));
+  const values = data.map((d) => (d?.[valueKey] == null ? 0 : Number(d[valueKey]) || 0));
   const max = Math.max(1, ...values);
   const min = Math.min(...values);
 
@@ -201,8 +153,8 @@ function MiniLineChart({ data, valueKey, height = 140 }) {
   };
 
   const toY = (v) => {
-    const range = Math.max(1, max - min);
-    const t = (v - min) / range; // 0..1
+    const range = Math.max(1e-9, max - min);
+    const t = (v - min) / range;
     return h - pad - t * (h - pad * 2);
   };
 
@@ -211,55 +163,15 @@ function MiniLineChart({ data, valueKey, height = 140 }) {
   const lastVal = last?.[valueKey];
 
   return (
-    <div style={{ width: "100%" }}>
+    <div className={styles.chartWrap}>
       <svg viewBox={`0 0 ${w} ${h}`} width="100%" height={h} role="img" aria-label="chart">
-        <polyline fill="none" stroke="currentColor" strokeWidth="3" points={pts} opacity="0.85" />
-        <line x1={pad} y1={h - pad} x2={w - pad} y2={h - pad} stroke="currentColor" opacity="0.15" />
+        <line x1={pad} y1={h - pad} x2={w - pad} y2={h - pad} stroke="currentColor" opacity="0.12" />
+        <polyline fill="none" stroke="currentColor" strokeWidth="3" points={pts} opacity="0.9" />
       </svg>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, opacity: 0.75 }}>
-        <span>{data[0]?.date}</span>
+      <div className={styles.chartFooter}>
+        <span>{data[0]?.date ?? "—"}</span>
         <span>Latest: {lastVal == null ? "—" : lastVal}</span>
-        <span>{data[data.length - 1]?.date}</span>
-      </div>
-    </div>
-  );
-}
-
-/* ================= Modal ================= */
-function Modal({ open, title, onClose, children }) {
-  if (!open) return null;
-  return (
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.45)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 16,
-        zIndex: 9999,
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "min(920px, 100%)",
-          background: "white",
-          borderRadius: 16,
-          padding: 16,
-          maxHeight: "80vh",
-          overflow: "auto",
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-          <h3 style={{ margin: 0 }}>{title}</h3>
-          <button onClick={onClose} style={{ padding: "8px 10px", borderRadius: 10 }}>
-            Close
-          </button>
-        </div>
-        <div style={{ marginTop: 12 }}>{children}</div>
+        <span>{data[data.length - 1]?.date ?? "—"}</span>
       </div>
     </div>
   );
@@ -280,10 +192,12 @@ export default function Fitness() {
 
   // UI
   const [selectedISO, setSelectedISO] = useState(() => new Date().toISOString().slice(0, 10));
-  // ✅ Default to DAILY (no range fetch on first load)
   const [rangeDays, setRangeDays] = useState("daily"); // "daily" | 7 | 30 | 90
   const [metric, setMetric] = useState("steps"); // steps | caloriesOut | restingHeartRate
-  const [workoutsOpen, setWorkoutsOpen] = useState(false);
+  const [historyDays, setHistoryDays] = useState(30);
+
+  const metricLabel =
+    metric === "steps" ? "Steps" : metric === "caloriesOut" ? "Calories Out" : "Resting HR";
 
   // Load Sheets CSV
   useEffect(() => {
@@ -298,7 +212,7 @@ export default function Fitness() {
         if (alive) setRows(parseCSV(txt));
       } catch (e) {
         console.error(e);
-        if (alive) setSheetErr("Could not load training log.");
+        if (alive) setSheetErr("Could not load training log (Google Sheets).");
       } finally {
         if (alive) setLoadingSheet(false);
       }
@@ -308,8 +222,8 @@ export default function Fitness() {
     };
   }, []);
 
-  // Build workouts grouped by ISO date from Sheets
-  const workoutsByISO = useMemo(() => {
+  // Build workouts grouped by ISO date from Sheets (LIFTS ONLY)
+  const liftsByISO = useMemo(() => {
     if (!rows.length) return new Map();
 
     const headers = rows[0];
@@ -322,7 +236,7 @@ export default function Fitness() {
     const cSets = col(headers, ["sets"]);
     const cReps = col(headers, ["reps"]);
     const cMi = col(headers, ["distance (mi)", "distance mi", "miles"]);
-    const cMin = col(headers, ["duration(min)", "duration (min)", "distance min", "minutes"]);
+    const cMin = col(headers, ["duration(min)", "duration (min)", "minutes", "duration"]);
     const cNotes = col(headers, ["notes", "comments", "note"]);
 
     let curDate = null;
@@ -336,22 +250,26 @@ export default function Fitness() {
       if (catCell) curCat = catCell;
       if (!curDate) continue;
 
+      const exercise = trim(r[cEx] ?? "");
+      const miles = trim(r[cMi] ?? "");
+      const minutes = trim(r[cMin] ?? "");
+
+      // Only keep lift rows (exercise exists AND not a run row)
+      if (!exercise) continue;
+      if (miles || minutes) continue;
+
       const e = {
         date: curDate,
         iso: toISODateLocal(curDate),
         category: curCat,
-        exercise: trim(r[cEx] ?? ""),
+        exercise,
         weight: trim(r[cWt] ?? ""),
         sets: trim(r[cSets] ?? ""),
         reps: trim(r[cReps] ?? ""),
-        miles: trim(r[cMi] ?? ""),
-        minutes: trim(r[cMin] ?? ""),
         notes: trim(r[cNotes] ?? ""),
       };
 
-      if (e.exercise || e.weight || e.sets || e.reps || e.miles || e.minutes || e.notes) {
-        entries.push(e);
-      }
+      entries.push(e);
     }
 
     const map = new Map();
@@ -359,10 +277,17 @@ export default function Fitness() {
       if (!map.has(e.iso)) map.set(e.iso, []);
       map.get(e.iso).push(e);
     }
+
+    // Sort each day's lifts in a stable way (exercise name)
+    for (const [k, arr] of map.entries()) {
+      arr.sort((a, b) => (a.exercise || "").localeCompare(b.exercise || ""));
+      map.set(k, arr);
+    }
+
     return map;
   }, [rows]);
 
-  // Load Fitbit day summary for selected date (runs on page load)
+  // Load Fitbit day summary for selected date
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -382,7 +307,7 @@ export default function Fitness() {
         console.error(e);
         if (alive) {
           setFitbitDay(null);
-          setFitbitErr("Could not load Fitbit day summary (check Worker + CORS).");
+          setFitbitErr("Could not load Fitbit day summary.");
         }
       } finally {
         if (alive) setFitbitLoading(false);
@@ -393,11 +318,10 @@ export default function Fitness() {
     };
   }, [selectedISO]);
 
-  // Load Fitbit range for chart ONLY when user selects 7/30/90 (not on initial load)
+  // Load Fitbit range for chart ONLY when user selects 7/30/90
   useEffect(() => {
     let alive = true;
 
-    // ✅ daily mode = don't fetch range
     if (rangeDays === "daily") {
       setFitbitRange([]);
       return () => {
@@ -425,33 +349,15 @@ export default function Fitness() {
     };
   }, [rangeDays]);
 
-  const selectedWorkouts = workoutsByISO.get(selectedISO) ?? [];
-  const hasWorkout = selectedWorkouts.length > 0;
+  // Selected day lifts
+  const selectedLifts = liftsByISO.get(selectedISO) ?? [];
 
-  const liftItems = selectedWorkouts.filter((x) => x.exercise && !trim(x.miles) && !trim(x.minutes));
-  const runItems = selectedWorkouts.filter((x) => trim(x.miles) || trim(x.minutes));
-
-  const runTotals = useMemo(() => {
-    let miTotal = 0;
-    let minTotal = 0;
-    for (const r of runItems) {
-      const d = parseFloat((r.miles || "").replace(/[^\d.]/g, ""));
-      const m = toMinutes(r.minutes);
-      if (!isNaN(d)) miTotal += d;
-      if (!isNaN(m)) minTotal += m;
-    }
-    return {
-      miles: miTotal,
-      minutes: minTotal,
-      pace: miTotal > 0 && minTotal > 0 ? paceFrom(miTotal, minTotal) : null,
-    };
-  }, [runItems]);
-
-  const metricLabel =
-    metric === "steps" ? "Steps" : metric === "caloriesOut" ? "Calories Out" : "Resting HR";
-
-  // Chart data only exists when range is selected
-  const chartData = fitbitRange;
+  // History list (recent days with lifts)
+  const historyList = useMemo(() => {
+    const allDays = Array.from(liftsByISO.keys()).sort((a, b) => b.localeCompare(a)); // newest first
+    const limited = allDays.slice(0, clamp(historyDays, 1, 365));
+    return limited.map((iso) => ({ iso, lifts: liftsByISO.get(iso) ?? [] }));
+  }, [liftsByISO, historyDays]);
 
   return (
     <main className={styles.fitnessWrap}>
@@ -460,34 +366,27 @@ export default function Fitness() {
 
         <header className={styles.hero}>
           <h1>Fitness Dashboard</h1>
-          <p className={styles.sub}>Fitbit daily stats + your logged workouts (Google Sheets).</p>
+          <p className={styles.sub}>Fitbit stats + lift tracking (Google Sheets).</p>
         </header>
 
         {/* Controls */}
         <section className={styles.panel}>
-          <div
-            style={{
-              display: "flex",
-              gap: 12,
-              flexWrap: "wrap",
-              alignItems: "end",
-              justifyContent: "space-between",
-            }}
-          >
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "end" }}>
-              <label style={{ display: "grid", gap: 6 }}>
-                <span style={{ fontSize: 12, opacity: 0.7 }}>Date</span>
+          <div className={styles.controlsRow}>
+            <div className={styles.controlsGroup}>
+              <label className={styles.field}>
+                <span className={styles.fieldLabel}>Date</span>
                 <input
+                  className={styles.input}
                   type="date"
                   value={selectedISO}
                   onChange={(e) => setSelectedISO(e.target.value)}
-                  style={{ padding: 10, borderRadius: 12, border: "1px solid rgba(0,0,0,0.15)" }}
                 />
               </label>
 
-              <label style={{ display: "grid", gap: 6 }}>
-                <span style={{ fontSize: 12, opacity: 0.7 }}>Chart range</span>
+              <label className={styles.field}>
+                <span className={styles.fieldLabel}>Chart range</span>
                 <select
+                  className={styles.select}
                   value={String(rangeDays)}
                   onChange={(e) => {
                     const v = e.target.value;
@@ -495,7 +394,6 @@ export default function Fitness() {
                     const n = clamp(parseInt(v, 10), 7, 90);
                     setRangeDays(n);
                   }}
-                  style={{ padding: 10, borderRadius: 12, border: "1px solid rgba(0,0,0,0.15)" }}
                 >
                   <option value="daily">Daily stats (default)</option>
                   <option value={7}>Last 7 days</option>
@@ -504,13 +402,9 @@ export default function Fitness() {
                 </select>
               </label>
 
-              <label style={{ display: "grid", gap: 6 }}>
-                <span style={{ fontSize: 12, opacity: 0.7 }}>Metric</span>
-                <select
-                  value={metric}
-                  onChange={(e) => setMetric(e.target.value)}
-                  style={{ padding: 10, borderRadius: 12, border: "1px solid rgba(0,0,0,0.15)" }}
-                >
+              <label className={styles.field}>
+                <span className={styles.fieldLabel}>Metric</span>
+                <select className={styles.select} value={metric} onChange={(e) => setMetric(e.target.value)}>
                   <option value="steps">Steps</option>
                   <option value="caloriesOut">Calories Out</option>
                   <option value="restingHeartRate">Resting HR</option>
@@ -519,139 +413,143 @@ export default function Fitness() {
             </div>
 
             <button
+              className={styles.btn}
               onClick={() => setSelectedISO(new Date().toISOString().slice(0, 10))}
-              style={{ padding: "10px 12px", borderRadius: 12 }}
             >
               Jump to Today
             </button>
           </div>
         </section>
 
-        {/* Fitbit overview */}
+        {/* ===== Tiles (Fitbit) ===== */}
+        <section className={styles.tileGrid}>
+          <Tile title="Steps" value={fitbitDay?.steps ?? "—"} sub={fmtDatePretty(selectedISO)} />
+          <Tile title="Calories Out" value={fitbitDay?.caloriesOut ?? "—"} sub={fmtDatePretty(selectedISO)} />
+          <Tile
+            title="Resting HR"
+            value={fitbitDay?.restingHeartRate ?? "—"}
+            sub={fitbitDay?.restingHeartRate ? "bpm" : fmtDatePretty(selectedISO)}
+          />
+        </section>
+
+        {/* ===== Fitbit Chart + Errors ===== */}
         <section className={styles.panel} style={{ marginTop: 14 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-            <h2 style={{ margin: 0 }}>Fitbit — {fmtDatePretty(selectedISO)}</h2>
-            {fitbitLoading ? <span style={{ opacity: 0.7 }}>Loading…</span> : null}
+          <div className={styles.sectionHead}>
+            <h2 className={styles.sectionTitle}>Fitbit Trend</h2>
+            <div className={styles.sectionMeta}>
+              {fitbitLoading ? "Loading daily summary…" : fmtDatePretty(selectedISO)}
+            </div>
           </div>
 
           {!!fitbitErr && <div className={`${styles.info} ${styles.error}`}>{fitbitErr}</div>}
 
-          {!fitbitErr && (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-                gap: 12,
-                marginTop: 12,
-              }}
-            >
-              <StatCard label="Steps" value={fitbitDay?.steps ?? "—"} />
-              <StatCard label="Calories Out" value={fitbitDay?.caloriesOut ?? "—"} />
-              <StatCard
-                label="Resting HR"
-                value={fitbitDay?.restingHeartRate ?? "—"}
-                suffix={fitbitDay?.restingHeartRate ? " bpm" : ""}
-              />
-            </div>
-          )}
+          <div className={styles.chartHead}>
+            <h3 className={styles.chartTitle}>{metricLabel}</h3>
+            <span className={styles.chartMeta}>
+              {rangeDays === "daily" ? "Daily stats shown above" : `${rangeDays} days`}
+            </span>
+          </div>
 
-          {/* Chart */}
-          <div style={{ marginTop: 14 }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "baseline",
-                gap: 12,
-                flexWrap: "wrap",
-              }}
-            >
-              <h3 style={{ margin: 0 }}>{metricLabel} Trend</h3>
-              <span style={{ fontSize: 12, opacity: 0.7 }}>
-                {rangeDays === "daily" ? "daily stats" : `${rangeDays} days`}
-              </span>
-            </div>
-
-            <div style={{ marginTop: 10 }}>
-              {rangeDays === "daily" ? (
-                <div className={styles.info}>
-                  Select 7 / 30 / 90 days to load a trend chart. (Daily stats are shown above by default.)
-                </div>
-              ) : chartData.length ? (
-                <MiniLineChart data={chartData} valueKey={metric} />
-              ) : (
-                <div className={styles.info}>No chart data yet.</div>
-              )}
-            </div>
+          <div className={styles.chartBox}>
+            {rangeDays === "daily" ? (
+              <div className={styles.info}>
+                Select 7 / 30 / 90 days to load a trend chart. (Daily stats are shown above by default.)
+              </div>
+            ) : fitbitRange.length ? (
+              <MiniLineChart data={fitbitRange} valueKey={metric} />
+            ) : (
+              <div className={styles.info}>No chart data yet.</div>
+            )}
           </div>
         </section>
 
-        {/* Workouts */}
+        {/* ===== Lifts (Selected Date) ===== */}
         <section className={styles.panel} style={{ marginTop: 14 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-            <div>
-              <h2 style={{ margin: 0 }}>Workouts — {fmtDatePretty(selectedISO)}</h2>
-              <div style={{ fontSize: 13, opacity: 0.75, marginTop: 4 }}>
-                {loadingSheet
-                  ? "Loading training log…"
-                  : sheetErr
-                  ? sheetErr
-                  : hasWorkout
-                  ? "Workout logged"
-                  : "No workout logged"}
-              </div>
+          <div className={styles.sectionHead}>
+            <h2 className={styles.sectionTitle}>Lifts — {fmtDatePretty(selectedISO)}</h2>
+            <div className={styles.sectionMeta}>
+              {loadingSheet ? "Loading log…" : sheetErr ? "Sheets error" : `${selectedLifts.length} lifts`}
             </div>
+          </div>
 
-            <button
-              onClick={() => setWorkoutsOpen(true)}
-              disabled={!hasWorkout}
-              style={{ padding: "10px 12px", borderRadius: 12, opacity: hasWorkout ? 1 : 0.55 }}
-              title={!hasWorkout ? "No workout logged for this date" : "View details"}
-            >
-              View details
+          {sheetErr ? <div className={`${styles.info} ${styles.error}`}>{sheetErr}</div> : null}
+
+          {!sheetErr && !loadingSheet && selectedLifts.length === 0 ? (
+            <div className={styles.info}>No lifts logged for this date.</div>
+          ) : null}
+
+          {!sheetErr && selectedLifts.length > 0 ? (
+            <div className={styles.liftGrid}>
+              {selectedLifts.map((it, i) => (
+                <LiftRow key={`${it.iso}-${i}`} item={it} />
+              ))}
+            </div>
+          ) : null}
+        </section>
+
+        {/* ===== Lift History ===== */}
+        <section className={styles.panel} style={{ marginTop: 14 }}>
+          <div className={styles.sectionHead}>
+            <h2 className={styles.sectionTitle}>Lift History</h2>
+            <div className={styles.sectionMeta}>Browse prior days from Sheets</div>
+          </div>
+
+          <div className={styles.historyBar}>
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>Show last</span>
+              <select
+                className={styles.select}
+                value={historyDays}
+                onChange={(e) => setHistoryDays(clamp(parseInt(e.target.value, 10) || 30, 1, 365))}
+              >
+                <option value={7}>7 days</option>
+                <option value={30}>30 days</option>
+                <option value={90}>90 days</option>
+                <option value={180}>180 days</option>
+                <option value={365}>365 days</option>
+              </select>
+            </label>
+
+            <button className={styles.btn} onClick={() => setSelectedISO(new Date().toISOString().slice(0, 10))}>
+              Today
             </button>
           </div>
 
-          {hasWorkout && (
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
-              <span className={styles.chip}>{liftItems.length} lifts</span>
-              <span className={styles.chip}>{runItems.length} runs</span>
-              {runTotals.miles > 0 ? <span className={styles.chip}>{runTotals.miles.toFixed(2)} mi</span> : null}
-              {runTotals.minutes > 0 ? <span className={styles.chip}>{formatDuration(runTotals.minutes)}</span> : null}
-              {runTotals.pace ? <span className={styles.chip}>{runTotals.pace}</span> : null}
+          {loadingSheet ? (
+            <div className={styles.info}>Loading history…</div>
+          ) : sheetErr ? (
+            <div className={`${styles.info} ${styles.error}`}>{sheetErr}</div>
+          ) : historyList.length === 0 ? (
+            <div className={styles.info}>No lift history found yet.</div>
+          ) : (
+            <div className={styles.historyList}>
+              {historyList.map(({ iso, lifts }) => (
+                <details key={iso} className={styles.historyDay}>
+                  <summary className={styles.historySummary}>
+                    <span className={styles.historyDate}>{fmtDatePretty(iso)}</span>
+                    <span className={styles.historyCount}>{lifts.length} lifts</span>
+                    <button
+                      className={styles.linkBtn}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setSelectedISO(iso);
+                      }}
+                      title="Jump to this date"
+                    >
+                      View
+                    </button>
+                  </summary>
+
+                  <div className={styles.historyItems}>
+                    {lifts.map((it, idx) => (
+                      <LiftRow key={`${iso}-${idx}`} item={it} compact />
+                    ))}
+                  </div>
+                </details>
+              ))}
             </div>
           )}
         </section>
-
-        <Modal open={workoutsOpen} onClose={() => setWorkoutsOpen(false)} title={`Workout Details — ${fmtDatePretty(selectedISO)}`}>
-          {!hasWorkout ? (
-            <div className={styles.info}>No workouts logged for this day.</div>
-          ) : (
-            <div style={{ display: "grid", gap: 14 }}>
-              {liftItems.length > 0 && (
-                <div>
-                  <h4 style={{ margin: "6px 0" }}>Lifts</h4>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
-                    {liftItems.map((it, i) => (
-                      <LiftCard key={i} item={it} />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {runItems.length > 0 && (
-                <div>
-                  <h4 style={{ margin: "6px 0" }}>Runs</h4>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 10 }}>
-                    {runItems.map((it, i) => (
-                      <RunCard key={i} item={it} />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </Modal>
 
         <footer className={styles.siteFoot}>© {new Date().getFullYear()} William Lopez</footer>
       </section>
@@ -659,48 +557,39 @@ export default function Fitness() {
   );
 }
 
-/* ---------- Cards ---------- */
-function StatCard({ label, value, suffix = "" }) {
+/* ---------- UI Pieces ---------- */
+
+function Tile({ title, value, sub }) {
   return (
-    <div className={styles.card} style={{ padding: 14 }}>
-      <div style={{ fontSize: 12, opacity: 0.7 }}>{label}</div>
-      <div style={{ fontSize: 28, fontWeight: 800, marginTop: 6 }}>
-        {value}
-        {suffix}
-      </div>
+    <div className={styles.tile}>
+      <div className={styles.tileTitle}>{title}</div>
+      <div className={styles.tileValue}>{value ?? "—"}</div>
+      <div className={styles.tileSub}>{sub ?? ""}</div>
     </div>
   );
 }
 
-function LiftCard({ item }) {
+function LiftRow({ item, compact = false }) {
   return (
-    <div className={styles.card} style={{ padding: 12 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
-        <strong>{item.exercise || "—"}</strong>
-        {item.weight ? <span className={styles.pill}>{item.weight}</span> : null}
+    <div className={`${styles.liftCard} ${compact ? styles.liftCardCompact : ""}`}>
+      <div className={styles.liftHead}>
+        <div className={styles.liftName}>{item.exercise || "—"}</div>
+        {item.weight ? <div className={styles.pill}>{item.weight}</div> : null}
       </div>
-      <div style={{ marginTop: 6, fontSize: 13, opacity: 0.85 }}>
-        Sets: {item.sets || "-"} · Reps: {item.reps || "-"}
-      </div>
-      {item.notes ? <div style={{ marginTop: 6, fontSize: 13, opacity: 0.7 }}>{item.notes}</div> : null}
-    </div>
-  );
-}
 
-function RunCard({ item }) {
-  const dist = item.miles ? parseFloat(item.miles.replace(/[^\d.]/g, "")) : null;
-  const mins = item.minutes ? toMinutes(item.minutes) : null;
-  const pace = dist && mins ? paceFrom(dist, mins) : null;
-
-  return (
-    <div className={styles.card} style={{ padding: 12 }}>
-      <div style={{ fontSize: 14 }}>
-        <strong>Run</strong>
-        {dist ? ` · ${dist} mi` : ""}
-        {mins ? ` · ${formatDuration(mins)}` : ""}
-        {pace ? ` · ${pace}` : ""}
+      <div className={styles.liftMeta}>
+        <span>Sets: {item.sets || "-"}</span>
+        <span className={styles.dot}>•</span>
+        <span>Reps: {item.reps || "-"}</span>
+        {item.category ? (
+          <>
+            <span className={styles.dot}>•</span>
+            <span className={styles.muted}>{item.category}</span>
+          </>
+        ) : null}
       </div>
-      {item.notes ? <div style={{ marginTop: 6, fontSize: 13, opacity: 0.7 }}>{item.notes}</div> : null}
+
+      {item.notes ? <div className={styles.liftNotes}>{item.notes}</div> : null}
     </div>
   );
 }
