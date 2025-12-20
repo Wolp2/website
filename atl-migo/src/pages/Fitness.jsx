@@ -175,11 +175,6 @@ function FitbitStatusBanner() {
           {fitbit.lastSyncTime && (
             <div style={{ opacity: 0.75, fontSize: 13 }}>
               Last token refresh: {new Date(fitbit.lastSyncTime).toLocaleString()}
-              {!fitbit.hasKV ? (
-                <span style={{ marginLeft: 8, opacity: 0.8 }}>
-                  (Tip: add KV to avoid refreshing every request)
-                </span>
-              ) : null}
             </div>
           )}
         </div>
