@@ -1,13 +1,20 @@
 .fitnessWrap {
-  --bg: #f6f7fb;
+  --bg: #f1f3f6;
+  --bg-grad-1: #f6f7f9;
+  --bg-grad-2: #e9ecf1;
+  --panel: #ffffff;
+  --card: #f9fafb;
   --text: #0f172a;
-  --muted: #64748b;
-  --card: #fff;
+  --muted: #98a8c9;
   --line: #e5e7eb;
   --accent: #16a34a;
-  --accent2: #22c55e;
+  --accent-soft: rgba(22, 163, 74, 0.15);
 
-  background: var(--bg);
+  background:
+    radial-gradient(1200px 600px at 10% -10%, var(--bg-grad-1) 0%, transparent 60%),
+    radial-gradient(800px 500px at 90% 10%, var(--bg-grad-2) 0%, transparent 55%),
+    linear-gradient(180deg, #e7ebf1 0%, var(--bg) 60%);
+
   min-height: 100dvh;
   color: var(--text);
   padding-top: 42px;
@@ -52,11 +59,14 @@
 
 /* Panel */
 .panel {
-  background: var(--card);
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f9fafb 100%);
   border: 1px solid var(--line);
   border-radius: 16px;
   padding: 1rem;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.6),
+    0 10px 30px rgba(0,0,0,0.06);
 }
 
 /* Controls */
@@ -229,7 +239,8 @@
   margin-top: 12px;
 }
 .liftCard {
-  background: #fff;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 12px;
@@ -283,7 +294,12 @@
   position: sticky;
   top: 10px;
   z-index: 5;
-  background: rgba(246, 247, 251, 0.9);
+  background:
+  linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.85),
+    rgba(245, 247, 250, 0.85)
+  );
   backdrop-filter: blur(6px);
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -316,8 +332,10 @@
   transform: translateY(1px);
 }
 .tabBtnActive {
-  border-color: #86efac;
-  background: linear-gradient(135deg, #ffffff, #f0fdf4);
+  border-color: var(--accent);
+  background:
+    linear-gradient(135deg, #ffffff, #f0fdf4);
+  box-shadow: 0 0 0 1px var(--accent-soft);
 }
 
 /* Split sections (Push / Pull / Legs / Other) */
@@ -362,17 +380,20 @@
 .exerciseCard {
   text-align: left;
   border: 1px solid var(--line);
-  background: #fff;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
   border-radius: 16px;
   padding: 12px;
   cursor: pointer;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
 }
 .exerciseCard:hover {
-  border-color: #c7f0d5;
+  border-color: var(--accent);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
 }
 .exerciseCardActive {
-  border-color: #86efac;
+  border-color: #c7f0d5;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
 }
 .exerciseName {
@@ -432,7 +453,7 @@
   background: #fff;
 }
 
-/* IMPORTANT: display grid was missing in your earlier CSS */
+
 .tr {
   display: grid;
   grid-template-columns: 140px 110px 70px 110px 1fr 90px;

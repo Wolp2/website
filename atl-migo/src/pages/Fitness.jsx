@@ -80,7 +80,6 @@ const fmtDatePretty = (iso) => {
 };
 
 const toISODateLocal = (d) => {
-  if (!d) return "";
   const yr = d.getFullYear();
   const mo = String(d.getMonth() + 1).padStart(2, "0");
   const da = String(d.getDate()).padStart(2, "0");
@@ -126,7 +125,10 @@ const normalizeExerciseName = (name) => {
 const normalizeSplit = (category, exerciseName) => {
   const cat = trim(category).toLowerCase();
   const ex = trim(exerciseName).toLowerCase();
+
+  // Your special-case fix
   if (ex.includes("back extension") || ex.includes("hyperextension")) return "pull";
+
   if (cat.includes("push")) return "push";
   if (cat.includes("pull")) return "pull";
   if (cat.includes("leg")) return "legs";
@@ -230,7 +232,7 @@ export default function Fitness() {
   const [fitbitLoading, setFitbitLoading] = useState(false);
 
   // UI
-  const [selectedISO, setSelectedISO] = useState(() => new Date().toISOString().slice(0, 10));
+  const [selectedISO, setSelectedISO] = useState(() => toISODateLocal(new Date()))
   const [rangeDays, setRangeDays] = useState("daily"); // "daily" | 7 | 30 | 90
   const [metric, setMetric] = useState("steps"); // steps | caloriesOut | restingHeartRate
 
@@ -430,7 +432,9 @@ export default function Fitness() {
 
     (async () => {
       try {
-        const r = await fetch(`${FITBIT_API}/fitbit/range?days=${encodeURIComponent(rangeDays)}`, { cache: "no-store" });
+        const r = await fetch(`${FITBIT_API}/fitbit/range?days=${encodeURIComponent(rangeDays)}`, {
+          cache: "no-store",
+        });
         const text = await r.text();
         if (!r.ok) throw new Error(text);
         const payload = JSON.parse(text);
@@ -447,7 +451,6 @@ export default function Fitness() {
   }, [rangeDays]);
 
   const trendData = useMemo(() => {
-    // fitbitRange items have keys: date, steps, caloriesOut, restingHeartRate...
     const key = metric;
     return (fitbitRange ?? []).map((d) => ({
       date: d.date,
@@ -459,7 +462,6 @@ export default function Fitness() {
 
   const goal = useMemo(() => {
     if (metric === "steps") return 10000;
-    // goals for other metrics can be added later
     return null;
   }, [metric]);
 
@@ -479,7 +481,12 @@ export default function Fitness() {
             <div className={styles.controlsGroup}>
               <label className={styles.field}>
                 <span className={styles.fieldLabel}>Date</span>
-                <input className={styles.input} type="date" value={selectedISO} onChange={(e) => setSelectedISO(e.target.value)} />
+                <input
+                  className={styles.input}
+                  type="date"
+                  value={selectedISO}
+                  onChange={(e) => setSelectedISO(e.target.value)}
+                />
               </label>
 
               <label className={styles.field}>
@@ -511,7 +518,7 @@ export default function Fitness() {
               </label>
             </div>
 
-            <button className={styles.btn} onClick={() => setSelectedISO(new Date().toISOString().slice(0, 10))}>
+            <button className={styles.btn} onClick={() => setSelectedISO(toISODateLocal(new Date()))}>
               Jump to Today
             </button>
           </div>
@@ -539,12 +546,16 @@ export default function Fitness() {
 
           <div className={styles.chartHead}>
             <h3 className={styles.chartTitle}>{metricLabel}</h3>
-            <span className={styles.chartMeta}>{rangeDays === "daily" ? "Daily stats shown above" : `${rangeDays} days`}</span>
+            <span className={styles.chartMeta}>
+              {rangeDays === "daily" ? "Daily stats shown above" : `${rangeDays} days`}
+            </span>
           </div>
 
           <div className={styles.chartBox}>
             {rangeDays === "daily" ? (
-              <div className={styles.info}>Select 7 / 30 / 90 days to load a trend chart. (Daily stats are shown above by default.)</div>
+              <div className={styles.info}>
+                Select 7 / 30 / 90 days to load a trend chart. (Daily stats are shown above by default.)
+              </div>
             ) : trendData.length ? (
               <FitbitTrendCharts title={metricLabel} data={trendData} rangeDays={Number(rangeDays)} goal={goal} trendWindow={14} />
             ) : (
@@ -564,7 +575,9 @@ export default function Fitness() {
 
           {sheetErr ? <div className={`${styles.info} ${styles.error}`}>{sheetErr}</div> : null}
 
-          {!sheetErr && !loadingSheet && selectedLifts.length === 0 ? <div className={styles.info}>No lifts logged for this date.</div> : null}
+          {!sheetErr && !loadingSheet && selectedLifts.length === 0 ? (
+            <div className={styles.info}>No lifts logged for this date.</div>
+          ) : null}
 
           {!sheetErr && selectedLifts.length > 0 ? (
             <div className={styles.liftGrid}>
@@ -577,59 +590,53 @@ export default function Fitness() {
 
         {/* Progress by Exercise */}
         <section className={styles.panel} style={{ marginTop: 14 }}>
+          {/* Header with tabs on the right */}
           <div className={styles.sectionHead}>
-            <h2 className={styles.sectionTitle}>Progress by Exercise</h2>
-            <div className={styles.sectionMeta}>Pick an exercise to see your history</div>
-          </div>
-
-          <div className={styles.exerciseBar}>
-            <label className={styles.field}>
-              <span className={styles.fieldLabel}>Search</span>
-              <input className={styles.input} value={exerciseQuery} onChange={(e) => setExerciseQuery(e.target.value)} placeholder="bench, incline, squat..." />
-            </label>
+            <div>
+              <h2 className={styles.sectionTitle}>Progress by Exercise</h2>
+              <div className={styles.sectionMeta}>Pick an exercise to see your history</div>
+            </div>
 
             <div className={styles.splitTabs}>
-              <button type="button" className={`${styles.tabBtn} ${splitFilter === "all" ? styles.tabBtnActive : ""}`} onClick={() => setSplitFilter("all")}>
+              <button
+                type="button"
+                className={`${styles.tabBtn} ${splitFilter === "all" ? styles.tabBtnActive : ""}`}
+                onClick={() => setSplitFilter("all")}
+              >
                 All
               </button>
-              <button type="button" className={`${styles.tabBtn} ${splitFilter === "push" ? styles.tabBtnActive : ""}`} onClick={() => setSplitFilter("push")}>
+              <button
+                type="button"
+                className={`${styles.tabBtn} ${splitFilter === "push" ? styles.tabBtnActive : ""}`}
+                onClick={() => setSplitFilter("push")}
+              >
                 Push
               </button>
-              <button type="button" className={`${styles.tabBtn} ${splitFilter === "pull" ? styles.tabBtnActive : ""}`} onClick={() => setSplitFilter("pull")}>
+              <button
+                type="button"
+                className={`${styles.tabBtn} ${splitFilter === "pull" ? styles.tabBtnActive : ""}`}
+                onClick={() => setSplitFilter("pull")}
+              >
                 Pull
               </button>
-              <button type="button" className={`${styles.tabBtn} ${splitFilter === "legs" ? styles.tabBtnActive : ""}`} onClick={() => setSplitFilter("legs")}>
+              <button
+                type="button"
+                className={`${styles.tabBtn} ${splitFilter === "legs" ? styles.tabBtnActive : ""}`}
+                onClick={() => setSplitFilter("legs")}
+              >
                 Legs
               </button>
-              <button type="button" className={`${styles.tabBtn} ${splitFilter === "other" ? styles.tabBtnActive : ""}`} onClick={() => setSplitFilter("other")}>
+              <button
+                type="button"
+                className={`${styles.tabBtn} ${splitFilter === "other" ? styles.tabBtnActive : ""}`}
+                onClick={() => setSplitFilter("other")}
+              >
                 Other
               </button>
             </div>
-
-            <label className={styles.field}>
-              <span className={styles.fieldLabel}>Exercise</span>
-              <select className={styles.select} value={selectedExercise} onChange={(e) => setSelectedExercise(e.target.value)}>
-                {exerciseNames.map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <button
-              className={styles.btn}
-              onClick={() => {
-                const first = selectedExerciseHistory[0];
-                if (first?.iso) setSelectedISO(first.iso);
-              }}
-              disabled={!selectedExerciseHistory.length}
-              title="Jump date picker to most recent entry"
-            >
-              Jump to Latest
-            </button>
           </div>
 
+          {/* Cards FIRST */}
           {(() => {
             const groupsToShow = splitFilter === "all" ? ["push", "pull", "legs", "other"] : [splitFilter];
 
@@ -682,12 +689,51 @@ export default function Fitness() {
             );
           })()}
 
+          {/* Search + Exercise dropdown BELOW cards */}
+          <div className={styles.exerciseBar}>
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>Search</span>
+              <input
+                className={styles.input}
+                value={exerciseQuery}
+                onChange={(e) => setExerciseQuery(e.target.value)}
+                placeholder="bench, incline, squat..."
+              />
+            </label>
+
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>Exercise</span>
+              <select className={styles.select} value={selectedExercise} onChange={(e) => setSelectedExercise(e.target.value)}>
+                {exerciseNames.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <button
+              className={styles.btn}
+              onClick={() => {
+                const first = selectedExerciseHistory[0];
+                if (first?.iso) setSelectedISO(first.iso);
+              }}
+              disabled={!selectedExerciseHistory.length}
+              title="Jump date picker to most recent entry"
+            >
+              Jump to Latest
+            </button>
+          </div>
+
+          {/* Results */}
           <div className={styles.tableWrap}>
             <div className={styles.tableHead}>
               <h3 className={styles.chartTitle} style={{ margin: 0 }}>
                 {selectedExercise || "Select an exercise"}
               </h3>
-              <span className={styles.chartMeta}>{selectedExerciseHistory.length ? `${selectedExerciseHistory.length} entries` : "No entries"}</span>
+              <span className={styles.chartMeta}>
+                {selectedExerciseHistory.length ? `${selectedExerciseHistory.length} entries` : "No entries"}
+              </span>
             </div>
 
             {selectedExerciseHistory.length ? (
