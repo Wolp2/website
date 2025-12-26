@@ -39,6 +39,12 @@ async function fitbitGet(accessToken, path) {
   return res.json();
 }
 
+function clampDays(d) {
+  const n = Number(d);
+  if (n === 7 || n === 30 || n === 90) return n;
+  return 30;
+}
+
 function toISODateLocal(d = new Date()) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -46,8 +52,19 @@ function toISODateLocal(d = new Date()) {
   return `${y}-${m}-${day}`;
 }
 
-function isISODate(s) {
-  return typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
+function daysAgoISO(days) {
+  const end = new Date();
+  const start = new Date(end);
+  start.setDate(start.getDate() - (days - 1));
+  return { startISO: toISODateLocal(start), endISO: toISODateLocal(end) };
+}
+
+function mapSeries(arr, valueKey = "value") {
+  if (!Array.isArray(arr)) return [];
+  return arr.map((p) => ({
+    date: p.dateTime,
+    value: Number.isFinite(Number(p?.[valueKey])) ? Number(p[valueKey]) : null,
+  }));
 }
 
 export async function onRequestGet({ env, request }) {
@@ -57,36 +74,47 @@ export async function onRequestGet({ env, request }) {
   let tokens = JSON.parse(raw);
   tokens = await refreshIfNeeded(env, tokens);
 
-  // Allow: /fitbit/today?date=YYYY-MM-DD
   const url = new URL(request.url);
-  const qDate = url.searchParams.get("date");
-  const day = isISODate(qDate) ? qDate : toISODateLocal(new Date());
+  const days = clampDays(url.searchParams.get("days"));
+  const { startISO, endISO } = daysAgoISO(days);
 
-  const activity = await fitbitGet(tokens.access_token, `/1/user/-/activities/date/${day}.json`);
-  const hr = await fitbitGet(tokens.access_token, `/1/user/-/activities/heart/date/${day}/1d.json`);
-  const sleepList = await fitbitGet(
+  // Steps & calories out via activity timeseries endpoints
+  const stepsRes = await fitbitGet(
     tokens.access_token,
-    `/1.2/user/-/sleep/list.json?beforeDate=${day}&sort=desc&offset=0&limit=10`
+    `/1/user/-/activities/steps/date/${startISO}/${endISO}.json`
   );
 
-  let sleepScore = null;
-  for (const s of sleepList?.sleep ?? []) {
-    if (s?.dateOfSleep !== day) continue;
+  const caloriesRes = await fitbitGet(
+    tokens.access_token,
+    `/1/user/-/activities/calories/date/${startISO}/${endISO}.json`
+  );
 
-    const rawScore = s?.score?.overall ?? s?.score?.score ?? null;
-    const score = Number(rawScore);
-    if (!Number.isFinite(score)) continue;
+  // Resting HR via heart endpoint (daily objects, each may include restingHeartRate)
+  const heartRes = await fitbitGet(
+    tokens.access_token,
+    `/1/user/-/activities/heart/date/${startISO}/${endISO}.json`
+  );
 
+  const steps = mapSeries(stepsRes?.["activities-steps"], "value");
+  const caloriesOut = mapSeries(caloriesRes?.["activities-calories"], "value");
 
-    if (sleepScore == null || score > sleepScore) sleepScore = score;
-  }
+  const restingHeartRate = Array.isArray(heartRes?.["activities-heart"])
+    ? heartRes["activities-heart"].map((d) => ({
+        date: d.dateTime,
+        value: Number.isFinite(Number(d?.value?.restingHeartRate))
+          ? Number(d.value.restingHeartRate)
+          : null,
+      }))
+    : [];
 
   return Response.json({
-    date: day,
-    caloriesOut: activity?.summary?.caloriesOut,
-    steps: activity?.summary?.steps,
-    restingHeartRate: hr?.["activities-heart"]?.[0]?.value?.restingHeartRate,
-    heartRateZones: hr?.["activities-heart"]?.[0]?.value?.heartRateZones,
-    sleepScore,
+    days,
+    start: startISO,
+    end: endISO,
+    data: {
+      steps,
+      caloriesOut,
+      restingHeartRate,
+    },
   });
 }

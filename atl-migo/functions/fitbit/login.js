@@ -4,7 +4,7 @@ export async function onRequestGet({ env, request }) {
 
   const redirectUri = new URL("/fitbit/callback", env.APP_BASE_URL).toString();
 
-  const scopes = ["activity", "heartrate", "profile"].join(" ");
+  const scopes = ["activity", "heartrate", "profile", "sleep"].join(" ");
 
   const auth = new URL("https://www.fitbit.com/oauth2/authorize");
   auth.searchParams.set("response_type", "code");
