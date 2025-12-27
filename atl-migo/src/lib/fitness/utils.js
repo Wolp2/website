@@ -1,5 +1,11 @@
 export const trim = (s) => (s ?? "").toString().trim();
 
+const norm = (s) =>
+  trim(s)
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/[^a-z0-9]/g, ""); // drop spaces/punct
+
 export function clamp(n, a, b) {
   return Math.max(a, Math.min(b, n));
 }
@@ -32,12 +38,26 @@ export function parseMDY(str) {
   return Number.isNaN(+d) ? null : d;
 }
 
-export function col(headers, names) {
-  const h = (headers || []).map((x) => trim(x).toLowerCase());
-  for (const n of names) {
-    const i = h.indexOf(String(n).toLowerCase());
-    if (i !== -1) return i;
+/**
+ * Find column index by header aliases (fuzzy).
+ * Matches: "DateFilled" == "datefilled" == "Date Filled"
+ * Also allows partials: alias "date" matches "datefilled".
+ */
+export function col(headers, aliases) {
+  const hs = (headers || []).map((h) => norm(h));
+
+  for (const a of aliases) {
+    const target = norm(a);
+
+    // exact normalized match
+    let idx = hs.indexOf(target);
+    if (idx !== -1) return idx;
+
+    // partial match
+    idx = hs.findIndex((h) => h === target || h.startsWith(target) || h.includes(target));
+    if (idx !== -1) return idx;
   }
+
   return -1;
 }
 
@@ -105,8 +125,8 @@ export function parseCSV(text) {
   row.push(cur);
   rows.push(row);
 
-  if (rows.length && rows[rows.length - 1].every((c) => trim(c) === "")) rows.pop();
-  return rows;
+  while (rows.length && rows[rows.length - 1].every((c) => trim(c) === "")) rows.pop();
+  return rows.filter((r) => !r.every((c) => trim(c) === ""));
 }
 
 export function normalizeExerciseName(name) {
@@ -121,7 +141,6 @@ export function normalizeSplit(category, exerciseName) {
   const cat = trim(category).toLowerCase();
   const ex = trim(exerciseName).toLowerCase();
 
-  // special-case fix
   if (ex.includes("back extension") || ex.includes("hyperextension")) return "pull";
 
   if (cat.includes("push")) return "push";
@@ -192,9 +211,7 @@ export function bestWeightInHistory(hist) {
 
 /**
  * Build lifts grouped by ISO date from CSV text OR parsed rows.
- * Accepts:
- *  - string (csv text) OR
- *  - string[][] (already parsed)
+ * CleanLog-friendly: prefers DateFilled/CategoryFilled when present.
  */
 export function buildLiftsByISO(csvOrRows) {
   const rows = Array.isArray(csvOrRows) ? csvOrRows : parseCSV(String(csvOrRows || ""));
@@ -203,45 +220,46 @@ export function buildLiftsByISO(csvOrRows) {
   const headers = rows[0];
   const body = rows.slice(1);
 
-  const cDate = col(headers, ["date"]);
-  const cCat = col(headers, ["category", "tag", "focus", "split", "type"]);
-  const cEx = col(headers, ["exercise"]);
+  const cDate = col(headers, ["datefilled", "date", "day"]);
+  const cCat = col(headers, ["categoryfilled", "category", "tag", "focus", "split", "type"]);
+  const cEx = col(headers, ["exercise", "movement", "lift"]);
   const cWt = col(headers, ["weight", "load", "lbs"]);
   const cSets = col(headers, ["sets"]);
   const cReps = col(headers, ["reps"]);
-  const cMi = col(headers, ["distance (mi)", "distance mi", "miles"]);
-  const cMin = col(headers, ["duration(min)", "duration (min)", "minutes", "duration"]);
+  const cMi = col(headers, ["miles", "distance(mi)", "distance(mi)", "distance", "distance mi"]);
+  const cMin = col(headers, ["minutes", "duration(min)", "duration", "time"]);
   const cNotes = col(headers, ["notes", "comments", "note"]);
 
-  let curDate = null;
-  let curCat = "";
   const entries = [];
 
   for (const r of body) {
-    const dateCell = trim(r[cDate] ?? "");
-    const catCell = trim(r[cCat] ?? "");
-    if (dateCell) curDate = parseMDY(dateCell) ?? curDate;
-    if (catCell) curCat = catCell;
-    if (!curDate) continue;
+    // Skip totally blank rows
+    if (!r || r.every((c) => trim(c) === "")) continue;
 
-    const exerciseRaw = trim(r[cEx] ?? "");
-    const miles = trim(r[cMi] ?? "");
-    const minutes = trim(r[cMin] ?? "");
+    const dateCell = cDate >= 0 ? trim(r[cDate]) : "";
+    const dt = parseMDY(dateCell);
+    if (!dt) continue;
 
+    const exerciseRaw = cEx >= 0 ? trim(r[cEx]) : "";
     if (!exerciseRaw) continue;
-    if (miles || minutes) continue; // skip runs/cardio rows
 
+    // If you *want* cardio later, remove this block and create a cardio feed
+    const miles = cMi >= 0 ? trim(r[cMi]) : "";
+    const minutes = cMin >= 0 ? trim(r[cMin]) : "";
+    if (miles || minutes) continue;
+
+    const category = cCat >= 0 ? trim(r[cCat]) : "";
     const exercise = normalizeExerciseName(exerciseRaw);
 
     entries.push({
-      date: curDate,
-      iso: toISODateLocal(curDate),
-      category: curCat,
+      date: dt,
+      iso: toISODateLocal(dt),
+      category,
       exercise,
-      weight: trim(r[cWt] ?? ""),
-      sets: trim(r[cSets] ?? ""),
-      reps: trim(r[cReps] ?? ""),
-      notes: trim(r[cNotes] ?? ""),
+      weight: cWt >= 0 ? trim(r[cWt]) : "",
+      sets: cSets >= 0 ? trim(r[cSets]) : "",
+      reps: cReps >= 0 ? trim(r[cReps]) : "",
+      notes: cNotes >= 0 ? trim(r[cNotes]) : "",
     });
   }
 
@@ -301,45 +319,38 @@ export function groupExercisesBySplit(exerciseIndex, exerciseQuery = "") {
 
   return groups;
 }
+
 export function buildTrendData(fitbitRange, metric) {
   if (!fitbitRange || !metric) return [];
 
-  // Back-compat / alias (optional)
   const key = metric === "sleepScore" ? "sleepQualityScore" : metric;
 
-  // Shape A: array of daily objects from /fitbit/range
   if (Array.isArray(fitbitRange)) {
-    return (
-      fitbitRange
-        .map((d) => {
-          const date = d?.date ?? null;
-          const v = Number(d?.[key]);
-          return { date, value: Number.isFinite(v) ? v : null };
-        })
-        .filter((p) => !!p.date)
-        .sort((a, b) => String(a.date).localeCompare(String(b.date)))
-    );
-  }
-
-  // Shape B: series object style
-  const series = fitbitRange?.[key];
-  if (!Array.isArray(series)) return [];
-
-  return (
-    series
-      .map((p) => {
-        const date = p?.date ?? null;
-        const v = Number(p?.value);
+    return fitbitRange
+      .map((d) => {
+        const date = d?.date ?? null;
+        const v = Number(d?.[key]);
         return { date, value: Number.isFinite(v) ? v : null };
       })
       .filter((p) => !!p.date)
-      .sort((a, b) => String(a.date).localeCompare(String(b.date)))
-  );
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  }
+
+  const series = fitbitRange?.[key];
+  if (!Array.isArray(series)) return [];
+
+  return series
+    .map((p) => {
+      const date = p?.date ?? null;
+      const v = Number(p?.value);
+      return { date, value: Number.isFinite(v) ? v : null };
+    })
+    .filter((p) => !!p.date)
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
 }
 
-
 export function getExtremes(points, better = "higher") {
-  const clean = (points ?? []).filter(p => Number.isFinite(p?.value));
+  const clean = (points ?? []).filter((p) => Number.isFinite(p?.value));
   if (!clean.length) return null;
 
   const minP = clean.reduce((a, b) => (b.value < a.value ? b : a));

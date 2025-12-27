@@ -4,14 +4,16 @@ import styles from "./Fitness.module.css";
 import FitbitTrendCharts from "../components/fitness/FitbitTrendCharts";
 import FitbitStatusBanner from "../components/fitness/FitbitStatusBanner";
 import FitnessTile from "../components/fitness/FitnessTile";
-import LiftRow from "../components/fitness/LiftRow";
+
+import FitnessHeader from "../components/fitness/layout/FitnessHeader";
+import FitnessControlBar from "../components/fitness/layout/FitnessControlBar";
+import DailyWorkoutSummaryCard from "../components/fitness/layout/DailyWorkoutSummaryCard";
+import WorkoutHistorySection from "../components/fitness/layout/WorkoutHistorySection";
 
 import {
-  bestWeightInHistory,
   buildExerciseIndex,
   buildLiftsByISO,
   buildTrendData,
-  clamp,
   fmtDatePretty,
   groupExercisesBySplit,
   splitLabel,
@@ -19,9 +21,10 @@ import {
 } from "../lib/fitness/utils";
 
 const SHEET_URL =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQZlEe5gpor6F0j6tRvsPrYhdrjOENGut0jUPdqTtyNYdefmRO72v1ogD9rLcUHN1HIJbMzkSfVNmRE/pub?gid=0&single=true&output=csv";
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQZlEe5gpor6F0j6tRvsPrYhdrjOENGut0jUPdqTtyNYdefmRO72v1ogD9rLcUHN1HIJbMzkSfVNmRE/pub?gid=1971811896&single=true&output=csv";
 
 const FITBIT_API = "https://fitbit.wlopez2014.workers.dev";
+const ALL_EXERCISES = "__ALL__";
 
 const fmtMins = (m) => {
   if (m == null || !Number.isFinite(Number(m))) return "—";
@@ -31,7 +34,22 @@ const fmtMins = (m) => {
   return h > 0 ? `${h}h ${mm}m` : `${mm}m`;
 };
 
+function topLiftForDay(lifts = []) {
+  if (!lifts.length) return null;
+  let best = lifts[0];
+  let bestW = Number(best.weight) || 0;
+  for (const it of lifts) {
+    const w = Number(it.weight) || 0;
+    if (w > bestW) {
+      best = it;
+      bestW = w;
+    }
+  }
+  return best;
+}
+
 export default function Fitness() {
+  // ===== Dark mode =====
   const [darkMode, setDarkMode] = useState(
     () => localStorage.getItem("fitness-dark") === "true"
   );
@@ -40,22 +58,30 @@ export default function Fitness() {
     localStorage.setItem("fitness-dark", String(darkMode));
   }, [darkMode]);
 
+  // ===== Sticky layout: measure toolbar height so exerciseBar sits perfectly under it =====
+  const [toolbarH, setToolbarH] = useState(104);
+
+  // ===== Global controls =====
   const [selectedISO, setSelectedISO] = useState(() => toISODateLocal(new Date()));
   const [rangeDays, setRangeDays] = useState("daily"); // "daily" | 7 | 30 | 90
   const [metric, setMetric] = useState("steps"); // steps | caloriesOut | restingHeartRate | sleepQualityScore
 
-  const [rows, setRows] = useState([]);
+  // ===== Sheet =====
+  const [rows, setRows] = useState("");
   const [loadingSheet, setLoadingSheet] = useState(true);
   const [sheetErr, setSheetErr] = useState("");
 
+  // ===== Fitbit =====
   const [fitbitDay, setFitbitDay] = useState(null);
   const [fitbitRange, setFitbitRange] = useState([]);
   const [fitbitErr, setFitbitErr] = useState("");
   const [fitbitLoading, setFitbitLoading] = useState(false);
 
+  // ===== Lift history controls =====
   const [exerciseQuery, setExerciseQuery] = useState("");
-  const [selectedExercise, setSelectedExercise] = useState("");
+  const [selectedExercise, setSelectedExercise] = useState(ALL_EXERCISES);
   const [splitFilter, setSplitFilter] = useState("all"); // all | push | pull | legs | other
+  const [historyLimit, setHistoryLimit] = useState(40);
 
   const metricLabel =
     metric === "steps"
@@ -66,13 +92,10 @@ export default function Fitness() {
       ? "Resting HR"
       : "Sleep Quality";
 
-  // Direction for "Best/Worst day" tiles in FitbitTrendCharts
   const better = metric === "restingHeartRate" ? "lower" : "higher";
-
-  // Goal line (optional)
   const goal = useMemo(() => (metric === "steps" ? 10000 : null), [metric]);
 
-  // Load Google Sheet rows (CSV)
+  // ===== Load Google Sheet rows (CSV) =====
   useEffect(() => {
     let alive = true;
 
@@ -106,27 +129,51 @@ export default function Fitness() {
     return groupExercisesBySplit(exerciseIndex, exerciseQuery);
   }, [exerciseIndex, exerciseQuery]);
 
-  const exerciseNames = useMemo(
-    () => [
+  const exerciseNames = useMemo(() => {
+    if (splitFilter === "push") return [ALL_EXERCISES, ...exerciseGroups.push];
+    if (splitFilter === "pull") return [ALL_EXERCISES, ...exerciseGroups.pull];
+    if (splitFilter === "legs") return [ALL_EXERCISES, ...exerciseGroups.legs];
+    if (splitFilter === "other") return [ALL_EXERCISES, ...exerciseGroups.other];
+    return [
+      ALL_EXERCISES,
       ...exerciseGroups.push,
       ...exerciseGroups.pull,
       ...exerciseGroups.legs,
       ...exerciseGroups.other,
-    ],
-    [exerciseGroups]
-  );
+    ];
+  }, [exerciseGroups, splitFilter]);
+
+  useEffect(() => {
+    if (!selectedExercise) setSelectedExercise(ALL_EXERCISES);
+    if (selectedExercise !== ALL_EXERCISES && !exerciseNames.includes(selectedExercise)) {
+      setSelectedExercise(ALL_EXERCISES);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exerciseNames.join("|")]);
+
+  useEffect(() => {
+    setHistoryLimit(40);
+  }, [selectedExercise, exerciseQuery, splitFilter]);
 
   const selectedExerciseHistory = useMemo(() => {
     if (!selectedExercise) return [];
-    return exerciseIndex.get(selectedExercise) ?? [];
-  }, [exerciseIndex, selectedExercise]);
 
-  useEffect(() => {
-    if (!selectedExercise && exerciseNames.length) setSelectedExercise(exerciseNames[0]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [exerciseNames.length]);
+    const inSplit = (it) => {
+      if (splitFilter === "all") return true;
+      return (it.split || "").toLowerCase() === splitFilter;
+    };
 
-  // Load Fitbit day summary for selected date
+    if (selectedExercise === ALL_EXERCISES) {
+      const all = [];
+      for (const arr of exerciseIndex.values()) all.push(...arr);
+      all.sort((a, b) => b.iso.localeCompare(a.iso));
+      return all.filter(inSplit);
+    }
+
+    return (exerciseIndex.get(selectedExercise) ?? []).filter(inSplit);
+  }, [exerciseIndex, selectedExercise, splitFilter]);
+
+  // ===== Fitbit day summary for selected date =====
   useEffect(() => {
     let alive = true;
 
@@ -161,7 +208,7 @@ export default function Fitness() {
     };
   }, [selectedISO]);
 
-  // Load Fitbit range only when user selects 7/30/90
+  // ===== Fitbit range only when user selects 7/30/90 =====
   useEffect(() => {
     let alive = true;
 
@@ -197,12 +244,10 @@ export default function Fitness() {
     };
   }, [rangeDays]);
 
-  // Build chart series (supports sleepQualityScore now)
-  const trendData = useMemo(() => {
-    return buildTrendData(fitbitRange, metric);
-  }, [fitbitRange, metric]);
+  const trendData = useMemo(() => buildTrendData(fitbitRange, metric), [fitbitRange, metric]);
 
   const selectedLifts = liftsByISO.get(selectedISO) ?? [];
+  const topLift = useMemo(() => topLiftForDay(selectedLifts), [selectedLifts]);
 
   const sleepSub = useMemo(() => {
     const s = fitbitDay;
@@ -216,330 +261,126 @@ export default function Fitness() {
     if (Number.isFinite(stages.light)) parts.push(`Light ${Math.round(stages.light)}m`);
     if (Number.isFinite(stages.wake)) parts.push(`Awake ${Math.round(stages.wake)}m`);
 
-    // If we have no stages, fall back to duration
-    if (!parts.length && s.sleepMinutes != null) {
-      parts.push(`Asleep ${fmtMins(s.sleepMinutes)}`);
-    }
+    if (!parts.length && s.sleepMinutes != null) parts.push(`Asleep ${fmtMins(s.sleepMinutes)}`);
 
     return parts.length ? parts.join(" • ") : fmtDatePretty(selectedISO);
   }, [fitbitDay, selectedISO]);
 
+  const historyTitle =
+    selectedExercise === ALL_EXERCISES
+      ? "All exercises"
+      : selectedExercise || "Select an exercise";
+
   return (
-    <main className={`${styles.fitnessWrap} ${darkMode ? styles.dark : ""}`}>
+    <main
+      className={`${styles.fitnessWrap} ${darkMode ? styles.dark : ""}`}
+      style={{ "--stickyToolbarH": `${toolbarH}px` }}
+    >
       <section className={styles.container}>
-        <div className={styles.statusRow}>
-          <FitbitStatusBanner apiBase={FITBIT_API} />
+        {/* HEADER (Status + Title) */}
+        <FitnessHeader
+          darkMode={darkMode}
+          onToggleDark={() => setDarkMode((d) => !d)}
+          statusSlot={<FitbitStatusBanner apiBase={FITBIT_API} />}
+        />
 
-          <button
-            type="button"
-            className={styles.darkToggle}
-            onClick={() => setDarkMode((d) => !d)}
-            aria-label="Toggle dark mode"
-          >
-            {darkMode ? "🔆 Light" : "🕶️ Dark"}
-          </button>
-        </div>
+        {/* STICKY CONTROL BAR (handled inside component) */}
+        <FitnessControlBar
+          styles={styles}
+          selectedISO={selectedISO}
+          onSelectedISO={setSelectedISO}
+          rangeDays={rangeDays}
+          onRangeDays={setRangeDays}
+          metric={metric}
+          onMetric={setMetric}
+          onJumpToToday={() => setSelectedISO(toISODateLocal(new Date()))}
+          onToolbarHeight={setToolbarH}
+        />
 
-        <header className={styles.hero}>
-          <h1>Fitness Dashboard</h1>
-          <p className={styles.sub}>Fitbit stats + lift tracking (Google Sheets).</p>
-        </header>
+        {/* MAIN STACK */}
+        <div className={styles.stack}>
+          {/* TODAY AT A GLANCE */}
+          <section className={styles.tileGrid} aria-label="Today at a glance">
+            <FitnessTile title="Steps" value={fitbitDay?.steps ?? "—"} sub={fmtDatePretty(selectedISO)} />
+            <FitnessTile
+              title="Calories Out"
+              value={fitbitDay?.caloriesOut ?? "—"}
+              sub={fmtDatePretty(selectedISO)}
+            />
+            <FitnessTile
+              title="Resting HR"
+              value={fitbitDay?.restingHeartRate ?? "—"}
+              sub={fitbitDay?.restingHeartRate ? "bpm" : fmtDatePretty(selectedISO)}
+            />
+            <FitnessTile title="Sleep Quality" value={fitbitDay?.sleepQualityScore ?? "—"} sub={sleepSub} />
+          </section>
 
-        <section className={styles.panel}>
-          <div className={styles.controlsRow}>
-            <div className={styles.controlsGroup}>
-              <label className={styles.field}>
-                <span className={styles.fieldLabel}>Date</span>
-                <input
-                  className={styles.input}
-                  type="date"
-                  value={selectedISO}
-                  onChange={(e) => setSelectedISO(e.target.value)}
-                />
-              </label>
-
-              <label className={styles.field}>
-                <span className={styles.fieldLabel}>Chart range</span>
-                <select
-                  className={styles.select}
-                  value={String(rangeDays)}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    if (v === "daily") return setRangeDays("daily");
-                    setRangeDays(clamp(parseInt(v, 10), 7, 90));
-                  }}
-                >
-                  <option value="daily">Daily stats (default)</option>
-                  <option value={7}>Last 7 days</option>
-                  <option value={30}>Last 30 days</option>
-                  <option value={90}>Last 90 days</option>
-                </select>
-              </label>
-
-              <label className={styles.field}>
-                <span className={styles.fieldLabel}>Metric</span>
-                <select
-                  className={styles.select}
-                  value={metric}
-                  onChange={(e) => setMetric(e.target.value)}
-                >
-                  <option value="steps">Steps</option>
-                  <option value="caloriesOut">Calories Out</option>
-                  <option value="restingHeartRate">Resting HR</option>
-                  <option value="sleepQualityScore">Sleep Quality</option>
-                </select>
-              </label>
-            </div>
-
-            <button
-              className={styles.btn}
-              onClick={() => setSelectedISO(toISODateLocal(new Date()))}
-            >
-              Jump to Today
-            </button>
-          </div>
-        </section>
-
-        <section className={styles.tileGrid}>
-          <FitnessTile
-            title="Steps"
-            value={fitbitDay?.steps ?? "—"}
-            sub={fmtDatePretty(selectedISO)}
-          />
-          <FitnessTile
-            title="Calories Out"
-            value={fitbitDay?.caloriesOut ?? "—"}
-            sub={fmtDatePretty(selectedISO)}
-          />
-          <FitnessTile
-            title="Resting HR"
-            value={fitbitDay?.restingHeartRate ?? "—"}
-            sub={fitbitDay?.restingHeartRate ? "bpm" : fmtDatePretty(selectedISO)}
-          />
-          <FitnessTile
-            title="Sleep Quality"
-            value={fitbitDay?.sleepQualityScore ?? "—"}
-            sub={sleepSub}
-          />
-        </section>
-
-        <section className={styles.panel} style={{ marginTop: 14 }}>
-          <div className={styles.sectionHead}>
-            <h2 className={styles.sectionTitle}>Fitbit Trend</h2>
-            <div className={styles.sectionMeta}>
-              {fitbitLoading ? "Loading daily summary…" : fmtDatePretty(selectedISO)}
-            </div>
-          </div>
-
-          {!!fitbitErr && <div className={`${styles.info} ${styles.error}`}>{fitbitErr}</div>}
-
-          <div className={styles.chartHead}>
-            <h3 className={styles.chartTitle}>{metricLabel}</h3>
-            <span className={styles.chartMeta}>
-              {rangeDays === "daily" ? "Daily stats shown above" : `${rangeDays} days`}
-            </span>
-          </div>
-
-          <div className={styles.chartBox}>
-            {rangeDays === "daily" ? (
-              <div className={styles.info}>Select 7 / 30 / 90 days to load a trend chart.</div>
-            ) : trendData.length ? (
-              <FitbitTrendCharts
-                title={metricLabel}
-                data={trendData}
-                rangeDays={Number(rangeDays)}
-                goal={goal}
-                trendWindow={14}
-                better={better}
-              />
-            ) : (
-              <div className={styles.info}>No chart data yet.</div>
-            )}
-          </div>
-        </section>
-
-        <section className={styles.panel} style={{ marginTop: 14 }}>
-          <div className={styles.sectionHead}>
-            <h2 className={styles.sectionTitle}>Lifts — {fmtDatePretty(selectedISO)}</h2>
-            <div className={styles.sectionMeta}>
-              {loadingSheet
-                ? "Loading log…"
-                : sheetErr
-                ? "Sheets error"
-                : `${selectedLifts.length} lifts`}
-            </div>
-          </div>
-
-          {sheetErr ? <div className={`${styles.info} ${styles.error}`}>{sheetErr}</div> : null}
-
-          {!sheetErr && !loadingSheet && selectedLifts.length === 0 ? (
-            <div className={styles.info}>No lifts logged for this date.</div>
-          ) : null}
-
-          {!sheetErr && selectedLifts.length > 0 ? (
-            <div className={styles.liftGrid}>
-              {selectedLifts.map((it, i) => (
-                <LiftRow key={`${it.iso}-${i}`} item={it} />
-              ))}
-            </div>
-          ) : null}
-        </section>
-
-        <section className={styles.panel} style={{ marginTop: 14 }}>
-          <div className={styles.sectionHead}>
-            <div>
-              <h2 className={styles.sectionTitle}>Progress by Exercise</h2>
-              <div className={styles.sectionMeta}>Pick an exercise to see your history</div>
-            </div>
-
-            <div className={styles.splitTabs}>
-              {["all", "push", "pull", "legs", "other"].map((k) => (
-                <button
-                  key={k}
-                  type="button"
-                  className={`${styles.tabBtn} ${splitFilter === k ? styles.tabBtnActive : ""}`}
-                  onClick={() => setSplitFilter(k)}
-                >
-                  {k === "all" ? "All" : splitLabel(k)}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {(() => {
-            const groupsToShow = splitFilter === "all" ? ["push", "pull", "legs", "other"] : [splitFilter];
-
-            return (
-              <div className={styles.splitSections}>
-                {groupsToShow.map((g) => {
-                  const list = exerciseGroups[g] ?? [];
-                  if (!list.length) return null;
-
-                  return (
-                    <div key={g} className={styles.splitSection}>
-                      <div className={styles.splitHeader}>
-                        <h3 className={styles.splitTitle}>{splitLabel(g)}</h3>
-                        <span className={styles.splitCount}>{list.length} exercises</span>
-                      </div>
-
-                      <div className={styles.exerciseGrid}>
-                        {list.slice(0, 18).map((name) => {
-                          const hist = exerciseIndex.get(name) ?? [];
-                          const last = hist[0];
-                          const best = bestWeightInHistory(hist);
-
-                          return (
-                            <button
-                              key={name}
-                              type="button"
-                              className={`${styles.exerciseCard} ${name === selectedExercise ? styles.exerciseCardActive : ""}`}
-                              onClick={() => setSelectedExercise(name)}
-                            >
-                              <div className={styles.exerciseName}>{name}</div>
-
-                              <div className={styles.exerciseLast}>
-                                <span className={styles.muted}>{last?.iso ? fmtDatePretty(last.iso) : "—"}</span>
-
-                                <div className={styles.badgeRow}>
-                                  {last?.weight ? <span className={styles.pill}>Last: {last.weight}</span> : null}
-                                  {best != null ? <span className={styles.pillAlt}>Best: {best} lb</span> : null}
-                                </div>
-                              </div>
-
-                              <div className={styles.exerciseMeta}>
-                                Sets: {last?.sets || "-"} • Reps: {last?.reps || "-"}
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
+          {/* TRENDS */}
+          <section className={styles.panel}>
+            <div className={styles.sectionHead}>
+              <h2 className={styles.sectionTitle}>Trends</h2>
+              <div className={styles.sectionMeta}>
+                {fitbitLoading ? "Loading daily summary…" : fmtDatePretty(selectedISO)}
               </div>
-            );
-          })()}
+            </div>
 
-          <div className={styles.exerciseBar}>
-            <label className={styles.field}>
-              <span className={styles.fieldLabel}>Search</span>
-              <input
-                className={styles.input}
-                value={exerciseQuery}
-                onChange={(e) => setExerciseQuery(e.target.value)}
-                placeholder="bench, incline, squat..."
-              />
-            </label>
+            {!!fitbitErr && <div className={`${styles.info} ${styles.error}`}>{fitbitErr}</div>}
 
-            <label className={styles.field}>
-              <span className={styles.fieldLabel}>Exercise</span>
-              <select
-                className={styles.select}
-                value={selectedExercise}
-                onChange={(e) => setSelectedExercise(e.target.value)}
-              >
-                {exerciseNames.map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <button
-              className={styles.btn}
-              onClick={() => {
-                const first = selectedExerciseHistory[0];
-                if (first?.iso) setSelectedISO(first.iso);
-              }}
-              disabled={!selectedExerciseHistory.length}
-              title="Jump date picker to most recent entry"
-            >
-              Jump to Latest
-            </button>
-          </div>
-
-          <div className={styles.tableWrap}>
-            <div className={styles.tableHead}>
-              <h3 className={styles.chartTitle} style={{ margin: 0 }}>
-                {selectedExercise || "Select an exercise"}
-              </h3>
+            <div className={styles.chartHead}>
+              <h3 className={styles.chartTitle}>{metricLabel}</h3>
               <span className={styles.chartMeta}>
-                {selectedExerciseHistory.length ? `${selectedExerciseHistory.length} entries` : "No entries"}
+                {rangeDays === "daily" ? "Daily stats shown above" : `Last ${rangeDays} days`}
               </span>
             </div>
 
-            {selectedExerciseHistory.length ? (
-              <div className={styles.table}>
-                <div className={`${styles.tr} ${styles.th}`}>
-                  <div>Date</div>
-                  <div>Weight</div>
-                  <div>Sets</div>
-                  <div>Reps</div>
-                  <div>Notes</div>
-                  <div></div>
-                </div>
+            <div className={styles.chartBox}>
+              {rangeDays === "daily" ? (
+                <div className={styles.info}>Select 7 / 30 / 90 days to load a trend chart.</div>
+              ) : trendData.length ? (
+                <FitbitTrendCharts
+                  title={metricLabel}
+                  data={trendData}
+                  rangeDays={Number(rangeDays)}
+                  goal={goal}
+                  trendWindow={14}
+                  better={better}
+                />
+              ) : (
+                <div className={styles.info}>No chart data yet.</div>
+              )}
+            </div>
+          </section>
 
-                {selectedExerciseHistory.slice(0, 40).map((it, idx) => (
-                  <div key={`${it.iso}-${idx}`} className={styles.tr}>
-                    <div>{fmtDatePretty(it.iso)}</div>
-                    <div>{it.weight || "—"}</div>
-                    <div>{it.sets || "—"}</div>
-                    <div>{it.reps || "—"}</div>
-                    <div className={styles.notesCell}>{it.notes || ""}</div>
-                    <div>
-                      <button className={styles.linkBtn} onClick={() => setSelectedISO(it.iso)}>
-                        View day
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className={styles.info}>No history for this exercise yet.</div>
-            )}
-          </div>
-        </section>
+          {/* DAILY WORKOUT SUMMARY */}
+          <DailyWorkoutSummaryCard
+            styles={styles}
+            iso={selectedISO}
+            loading={loadingSheet}
+            error={sheetErr}
+            lifts={selectedLifts}
+            topLift={topLift}
+          />
+
+          {/* WORKOUT HISTORY */}
+          <WorkoutHistorySection
+            styles={styles}
+            splitFilter={splitFilter}
+            onSplitFilter={setSplitFilter}
+            splitLabel={splitLabel}
+            exerciseQuery={exerciseQuery}
+            onExerciseQuery={setExerciseQuery}
+            selectedExercise={selectedExercise}
+            onSelectedExercise={setSelectedExercise}
+            exerciseNames={exerciseNames}
+            ALL_EXERCISES={ALL_EXERCISES}
+            historyTitle={historyTitle}
+            history={selectedExerciseHistory}
+            historyLimit={historyLimit}
+            onLoadMore={() => setHistoryLimit((n) => n + 40)}
+            onShowAll={() => setHistoryLimit(selectedExerciseHistory.length)}
+            onViewDay={(iso) => setSelectedISO(iso)}
+          />
+        </div>
 
         <footer className={styles.siteFoot}>© {new Date().getFullYear()} William Lopez</footer>
       </section>

@@ -1,8 +1,14 @@
 export const trim = (s) => (s ?? "").toString().trim();
 
+const norm = (s) =>
+  trim(s)
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/[^a-z0-9]/g, ""); // remove spaces, punctuation, parentheses, etc.
+
 /**
  * Minimal CSV parser (handles quoted cells, commas, newlines)
- * Returns: rows[][] (array of rows, each row array of cell strings)
+ * Returns: string[][] where row 0 is headers
  */
 export function parseCSV(text) {
   const rows = [];
@@ -54,16 +60,31 @@ export function parseCSV(text) {
   row.push(cur);
   rows.push(row);
 
-  // drop trailing blank line if present
-  if (rows.length && rows[rows.length - 1].every((c) => trim(c) === "")) rows.pop();
-  return rows;
+  // Drop completely empty trailing rows
+  while (rows.length && rows[rows.length - 1].every((c) => trim(c) === "")) rows.pop();
+
+  // Also drop any fully-empty rows in the middle (rare, but happens)
+  return rows.filter((r) => !r.every((c) => trim(c) === ""));
 }
 
-export function colIndex(headers, names) {
-  const h = headers.map((x) => trim(x).toLowerCase());
-  for (const n of names) {
-    const idx = h.indexOf(n.toLowerCase());
+/**
+ * Find a column index by header aliases.
+ * Matches loosely: "Date Filled" == "datefilled" == "DateFilled"
+ */
+export function colIndex(headers, aliases) {
+  const hs = headers.map((h) => norm(h));
+
+  for (const a of aliases) {
+    const target = norm(a);
+
+    // Exact normalized match
+    let idx = hs.indexOf(target);
+    if (idx !== -1) return idx;
+
+    // Contains match (so "datefilled" will match "datefillediso" etc.)
+    idx = hs.findIndex((h) => h === target || h.startsWith(target) || h.includes(target));
     if (idx !== -1) return idx;
   }
+
   return -1;
 }
