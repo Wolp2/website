@@ -1,25 +1,37 @@
-import styles from "../../../pages/Fitness.module.css";
+export default function FitnessHeader({
+  styles,
+  darkMode,
+  onToggleDark,
+  connected = false,
+  lastSyncTime = null,
+}) {
+  const lastSyncLabel = lastSyncTime
+    ? new Date(lastSyncTime).toLocaleString()
+    : "—";
 
-export default function FitnessHeader({ darkMode, onToggleDark, statusSlot }) {
   return (
-    <>
-      <div className={styles.statusRow}>
-        <div>{statusSlot}</div>
+    <header className={styles.fitnessHeader}>
+      <div className={styles.headerLeft}>
+        <h1 className={styles.pageTitle}>Fitness Dashboard</h1>
 
-        <button
-          type="button"
-          className={styles.darkToggle}
-          onClick={onToggleDark}
-          aria-label="Toggle dark mode"
-        >
-          {darkMode ? "🔆 Light" : "🕶️ Dark"}
-        </button>
+        <div className={styles.headerMeta}>
+          <span className={connected ? styles.statusOk : styles.statusErr}>
+            {connected ? "Fitbit connected" : "Fitbit disconnected"}
+          </span>
+          <span className={styles.dot}>•</span>
+          <span>Last synced {lastSyncLabel}</span>
+        </div>
       </div>
 
-      <header className={styles.hero}>
-        <h1>Fitness Dashboard</h1>
-        <p className={styles.sub}>Fitbit stats + lift tracking (Google Sheets).</p>
-      </header>
-    </>
+      <button
+        type="button"
+        className={styles.darkToggle}
+        onClick={onToggleDark}
+        aria-label="Toggle dark mode"
+        title="Toggle dark mode"
+      >
+        {darkMode ? "☀️" : "🌙"}
+      </button>
+    </header>
   );
 }

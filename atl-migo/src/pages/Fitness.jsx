@@ -13,7 +13,6 @@ import WorkoutHistorySection from "../components/fitness/layout/WorkoutHistorySe
 import {
   buildExerciseIndex,
   buildLiftsByISO,
-  buildTrendData,
   fmtDatePretty,
   groupExercisesBySplit,
   splitLabel,
@@ -49,7 +48,7 @@ function topLiftForDay(lifts = []) {
 }
 
 export default function Fitness() {
-  // ===== Dark mode =====
+  /** ================= Dark mode ================= */
   const [darkMode, setDarkMode] = useState(
     () => localStorage.getItem("fitness-dark") === "true"
   );
@@ -58,30 +57,13 @@ export default function Fitness() {
     localStorage.setItem("fitness-dark", String(darkMode));
   }, [darkMode]);
 
-  // ===== Sticky layout: measure toolbar height so exerciseBar sits perfectly under it =====
+  /** ================= Sticky layout ================= */
   const [toolbarH, setToolbarH] = useState(104);
 
-  // ===== Global controls =====
+  /** ================= Global controls ================= */
   const [selectedISO, setSelectedISO] = useState(() => toISODateLocal(new Date()));
-  const [rangeDays, setRangeDays] = useState("daily"); // "daily" | 7 | 30 | 90
+  const [rangeDays, setRangeDays] = useState("daily"); // "daily" | "7" | "30" | "90"
   const [metric, setMetric] = useState("steps"); // steps | caloriesOut | restingHeartRate | sleepQualityScore
-
-  // ===== Sheet =====
-  const [rows, setRows] = useState("");
-  const [loadingSheet, setLoadingSheet] = useState(true);
-  const [sheetErr, setSheetErr] = useState("");
-
-  // ===== Fitbit =====
-  const [fitbitDay, setFitbitDay] = useState(null);
-  const [fitbitRange, setFitbitRange] = useState([]);
-  const [fitbitErr, setFitbitErr] = useState("");
-  const [fitbitLoading, setFitbitLoading] = useState(false);
-
-  // ===== Lift history controls =====
-  const [exerciseQuery, setExerciseQuery] = useState("");
-  const [selectedExercise, setSelectedExercise] = useState(ALL_EXERCISES);
-  const [splitFilter, setSplitFilter] = useState("all"); // all | push | pull | legs | other
-  const [historyLimit, setHistoryLimit] = useState(40);
 
   const metricLabel =
     metric === "steps"
@@ -95,7 +77,16 @@ export default function Fitness() {
   const better = metric === "restingHeartRate" ? "lower" : "higher";
   const goal = useMemo(() => (metric === "steps" ? 10000 : null), [metric]);
 
-  // ===== Load Google Sheet rows (CSV) =====
+  const setMetricFromTile = (nextMetric) => {
+    setMetric(nextMetric);
+    setRangeDays((r) => (r === "daily" ? "7" : r));
+  };
+
+  /** ================= Sheet ================= */
+  const [rows, setRows] = useState("");
+  const [loadingSheet, setLoadingSheet] = useState(true);
+  const [sheetErr, setSheetErr] = useState("");
+
   useEffect(() => {
     let alive = true;
 
@@ -121,59 +112,25 @@ export default function Fitness() {
     };
   }, []);
 
-  // ===== Derived data =====
   const liftsByISO = useMemo(() => buildLiftsByISO(rows), [rows]);
   const exerciseIndex = useMemo(() => buildExerciseIndex(liftsByISO), [liftsByISO]);
 
-  const exerciseGroups = useMemo(() => {
-    return groupExercisesBySplit(exerciseIndex, exerciseQuery);
-  }, [exerciseIndex, exerciseQuery]);
+  /** ================= Fitbit ================= */
+  const [fitbitDay, setFitbitDay] = useState(null);
+  const [fitbitRange, setFitbitRange] = useState([]);
+  const trendData = useMemo(() => {
+    if (rangeDays === "daily") return [];
+    return Array.isArray(fitbitRange) ? fitbitRange : [];
+  }, [fitbitRange, rangeDays]);
+  const [fitbitErr, setFitbitErr] = useState("");
+  const [fitbitLoading, setFitbitLoading] = useState(false);
 
-  const exerciseNames = useMemo(() => {
-    if (splitFilter === "push") return [ALL_EXERCISES, ...exerciseGroups.push];
-    if (splitFilter === "pull") return [ALL_EXERCISES, ...exerciseGroups.pull];
-    if (splitFilter === "legs") return [ALL_EXERCISES, ...exerciseGroups.legs];
-    if (splitFilter === "other") return [ALL_EXERCISES, ...exerciseGroups.other];
-    return [
-      ALL_EXERCISES,
-      ...exerciseGroups.push,
-      ...exerciseGroups.pull,
-      ...exerciseGroups.legs,
-      ...exerciseGroups.other,
-    ];
-  }, [exerciseGroups, splitFilter]);
+  const [fitbitStatus, setFitbitStatus] = useState({
+    connected: false,
+    lastSyncTime: null,
+    hasKV: false,
+  });
 
-  useEffect(() => {
-    if (!selectedExercise) setSelectedExercise(ALL_EXERCISES);
-    if (selectedExercise !== ALL_EXERCISES && !exerciseNames.includes(selectedExercise)) {
-      setSelectedExercise(ALL_EXERCISES);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [exerciseNames.join("|")]);
-
-  useEffect(() => {
-    setHistoryLimit(40);
-  }, [selectedExercise, exerciseQuery, splitFilter]);
-
-  const selectedExerciseHistory = useMemo(() => {
-    if (!selectedExercise) return [];
-
-    const inSplit = (it) => {
-      if (splitFilter === "all") return true;
-      return (it.split || "").toLowerCase() === splitFilter;
-    };
-
-    if (selectedExercise === ALL_EXERCISES) {
-      const all = [];
-      for (const arr of exerciseIndex.values()) all.push(...arr);
-      all.sort((a, b) => b.iso.localeCompare(a.iso));
-      return all.filter(inSplit);
-    }
-
-    return (exerciseIndex.get(selectedExercise) ?? []).filter(inSplit);
-  }, [exerciseIndex, selectedExercise, splitFilter]);
-
-  // ===== Fitbit day summary for selected date =====
   useEffect(() => {
     let alive = true;
 
@@ -208,7 +165,6 @@ export default function Fitness() {
     };
   }, [selectedISO]);
 
-  // ===== Fitbit range only when user selects 7/30/90 =====
   useEffect(() => {
     let alive = true;
 
@@ -222,7 +178,9 @@ export default function Fitness() {
     (async () => {
       try {
         const r = await fetch(
-          `${FITBIT_API}/fitbit/range?days=${encodeURIComponent(rangeDays)}`,
+          `${FITBIT_API}/fitbit/range?days=${encodeURIComponent(rangeDays)}&end=${encodeURIComponent(
+            selectedISO
+          )}`,
           { cache: "no-store" }
         );
 
@@ -232,7 +190,7 @@ export default function Fitness() {
         const payload = JSON.parse(text);
         if (!alive) return;
 
-        setFitbitRange(payload.data ?? []);
+        setFitbitRange(Array.isArray(payload?.data) ? payload.data : []);
       } catch (e) {
         console.error(e);
         if (alive) setFitbitRange([]);
@@ -242,10 +200,69 @@ export default function Fitness() {
     return () => {
       alive = false;
     };
-  }, [rangeDays]);
+  }, [rangeDays, selectedISO]);
 
-  const trendData = useMemo(() => buildTrendData(fitbitRange, metric), [fitbitRange, metric]);
+  /** ================= Lift history controls ================= */
+  const [exerciseQuery, setExerciseQuery] = useState("");
+  const [selectedExercise, setSelectedExercise] = useState(ALL_EXERCISES);
+  const [splitFilter, setSplitFilter] = useState("all");
+  const [historyLimit, setHistoryLimit] = useState(40);
 
+  const exerciseGroups = useMemo(
+    () => groupExercisesBySplit(exerciseIndex, exerciseQuery),
+    [exerciseIndex, exerciseQuery]
+  );
+
+  const exerciseNames = useMemo(() => {
+    const groups =
+      splitFilter === "push"
+        ? exerciseGroups.push
+        : splitFilter === "pull"
+        ? exerciseGroups.pull
+        : splitFilter === "legs"
+        ? exerciseGroups.legs
+        : splitFilter === "other"
+        ? exerciseGroups.other
+        : [
+            ...exerciseGroups.push,
+            ...exerciseGroups.pull,
+            ...exerciseGroups.legs,
+            ...exerciseGroups.other,
+          ];
+
+    return [ALL_EXERCISES, ...groups];
+  }, [exerciseGroups, splitFilter]);
+
+  useEffect(() => {
+    if (!selectedExercise) setSelectedExercise(ALL_EXERCISES);
+    if (selectedExercise !== ALL_EXERCISES && !exerciseNames.includes(selectedExercise)) {
+      setSelectedExercise(ALL_EXERCISES);
+    }
+  }, [exerciseNames.join("|")]);
+
+  useEffect(() => {
+    setHistoryLimit(40);
+  }, [selectedExercise, exerciseQuery, splitFilter]);
+
+  const selectedExerciseHistory = useMemo(() => {
+    if (!selectedExercise) return [];
+
+    const inSplit = (it) => {
+      if (splitFilter === "all") return true;
+      return (it.split || "").toLowerCase() === splitFilter;
+    };
+
+    if (selectedExercise === ALL_EXERCISES) {
+      const all = [];
+      for (const arr of exerciseIndex.values()) all.push(...arr);
+      all.sort((a, b) => b.iso.localeCompare(a.iso));
+      return all.filter(inSplit);
+    }
+
+    return (exerciseIndex.get(selectedExercise) ?? []).filter(inSplit);
+  }, [exerciseIndex, selectedExercise, splitFilter]);
+
+  /** ================= Selected day workout ================= */
   const selectedLifts = liftsByISO.get(selectedISO) ?? [];
   const topLift = useMemo(() => topLiftForDay(selectedLifts), [selectedLifts]);
 
@@ -267,9 +284,7 @@ export default function Fitness() {
   }, [fitbitDay, selectedISO]);
 
   const historyTitle =
-    selectedExercise === ALL_EXERCISES
-      ? "All exercises"
-      : selectedExercise || "Select an exercise";
+    selectedExercise === ALL_EXERCISES ? "All exercises" : selectedExercise || "Select an exercise";
 
   return (
     <main
@@ -277,14 +292,16 @@ export default function Fitness() {
       style={{ "--stickyToolbarH": `${toolbarH}px` }}
     >
       <section className={styles.container}>
-        {/* HEADER (Status + Title) */}
         <FitnessHeader
+          styles={styles}
           darkMode={darkMode}
           onToggleDark={() => setDarkMode((d) => !d)}
-          statusSlot={<FitbitStatusBanner apiBase={FITBIT_API} />}
+          connected={fitbitStatus.connected}
+          lastSyncTime={fitbitStatus.lastSyncTime}
         />
 
-        {/* STICKY CONTROL BAR (handled inside component) */}
+        <FitbitStatusBanner apiBase={FITBIT_API} onStatus={setFitbitStatus} />
+
         <FitnessControlBar
           styles={styles}
           selectedISO={selectedISO}
@@ -297,61 +314,86 @@ export default function Fitness() {
           onToolbarHeight={setToolbarH}
         />
 
-        {/* MAIN STACK */}
         <div className={styles.stack}>
-          {/* TODAY AT A GLANCE */}
-          <section className={styles.tileGrid} aria-label="Today at a glance">
-            <FitnessTile title="Steps" value={fitbitDay?.steps ?? "—"} sub={fmtDatePretty(selectedISO)} />
-            <FitnessTile
-              title="Calories Out"
-              value={fitbitDay?.caloriesOut ?? "—"}
-              sub={fmtDatePretty(selectedISO)}
-            />
-            <FitnessTile
-              title="Resting HR"
-              value={fitbitDay?.restingHeartRate ?? "—"}
-              sub={fitbitDay?.restingHeartRate ? "bpm" : fmtDatePretty(selectedISO)}
-            />
-            <FitnessTile title="Sleep Quality" value={fitbitDay?.sleepQualityScore ?? "—"} sub={sleepSub} />
-          </section>
-
-          {/* TRENDS */}
-          <section className={styles.panel}>
-            <div className={styles.sectionHead}>
-              <h2 className={styles.sectionTitle}>Trends</h2>
-              <div className={styles.sectionMeta}>
-                {fitbitLoading ? "Loading daily summary…" : fmtDatePretty(selectedISO)}
-              </div>
-            </div>
-
-            {!!fitbitErr && <div className={`${styles.info} ${styles.error}`}>{fitbitErr}</div>}
-
-            <div className={styles.chartHead}>
-              <h3 className={styles.chartTitle}>{metricLabel}</h3>
-              <span className={styles.chartMeta}>
-                {rangeDays === "daily" ? "Daily stats shown above" : `Last ${rangeDays} days`}
-              </span>
-            </div>
-
-            <div className={styles.chartBox}>
-              {rangeDays === "daily" ? (
-                <div className={styles.info}>Select 7 / 30 / 90 days to load a trend chart.</div>
-              ) : trendData.length ? (
-                <FitbitTrendCharts
-                  title={metricLabel}
-                  data={trendData}
-                  rangeDays={Number(rangeDays)}
-                  goal={goal}
-                  trendWindow={14}
-                  better={better}
+          <section className={styles.topGrid} aria-label="Overview">
+            <div className={styles.tilesStack}>
+              <section className={styles.tileGrid} aria-label="Today at a glance">
+                <FitnessTile
+                  className={styles.tileSteps}
+                  icon="steps"
+                  title="Steps"
+                  value={fitbitDay?.steps ?? "—"}
+                  sub={fmtDatePretty(selectedISO)}
+                  active={metric === "steps"}
+                  onClick={() => setMetricFromTile("steps")}
                 />
-              ) : (
-                <div className={styles.info}>No chart data yet.</div>
-              )}
+
+                <FitnessTile
+                  className={styles.tileCalories}
+                  icon="calories"
+                  title="Calories Out"
+                  value={fitbitDay?.caloriesOut ?? "—"}
+                  sub={fmtDatePretty(selectedISO)}
+                  active={metric === "caloriesOut"}
+                  onClick={() => setMetricFromTile("caloriesOut")}
+                />
+
+                <FitnessTile
+                  className={styles.tileRhr}
+                  icon="rhr"
+                  title="Resting HR"
+                  value={fitbitDay?.restingHeartRate ?? "—"}
+                  sub={fitbitDay?.restingHeartRate ? "bpm" : fmtDatePretty(selectedISO)}
+                  active={metric === "restingHeartRate"}
+                  onClick={() => setMetricFromTile("restingHeartRate")}
+                />
+
+                <FitnessTile
+                  className={styles.tileSleep}
+                  icon="sleep"
+                  title="Sleep Quality"
+                  value={fitbitDay?.sleepQualityScore ?? "—"}
+                  sub={sleepSub}
+                  active={metric === "sleepQualityScore"}
+                  onClick={() => setMetricFromTile("sleepQualityScore")}
+                />
+              </section>
             </div>
+
+            <section className={styles.panel}>
+              <div className={styles.sectionHead}>
+                <h2 className={styles.sectionTitle}>Trends</h2>
+                <div className={styles.sectionMeta}>
+                  {fitbitLoading ? "Loading daily summary…" : fmtDatePretty(selectedISO)}
+                </div>
+              </div>
+
+              {!!fitbitErr && <div className={`${styles.info} ${styles.error}`}>{fitbitErr}</div>}
+
+              <div className={styles.chartHead}>
+                <h3 className={styles.chartTitle}>{metricLabel}</h3>
+                <span className={styles.chartMeta}>
+                  {rangeDays === "daily" ? "Daily stats shown above" : `Last ${rangeDays} days`}
+                </span>
+              </div>
+
+              <div className={styles.chartBox}>
+                {rangeDays === "daily" ? (
+                  <div className={styles.info}>Select 7 / 30 / 90 days to load a trend chart.</div>
+                ) : trendData.length ? (
+                  <FitbitTrendCharts
+                    data={trendData}
+                    rangeDays={Number(rangeDays)}
+                    goal={goal}
+                    dataKey={metric}
+                  />
+                ) : (
+                  <div className={styles.info}>No chart data yet.</div>
+                )}
+              </div>
+            </section>
           </section>
 
-          {/* DAILY WORKOUT SUMMARY */}
           <DailyWorkoutSummaryCard
             styles={styles}
             iso={selectedISO}
@@ -361,7 +403,6 @@ export default function Fitness() {
             topLift={topLift}
           />
 
-          {/* WORKOUT HISTORY */}
           <WorkoutHistorySection
             styles={styles}
             splitFilter={splitFilter}

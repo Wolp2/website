@@ -1,163 +1,35 @@
-.wrap {
-    width: 100%;
-  }
-  
-  /* Header */
-  .headerRow {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 12px;
-  }
-  
-  .h2 {
-    margin: 0;
-    font-size: 22px;
-  }
-  
-  .h3 {
-    margin: 0 0 10px 0;
-    font-size: 16px;
-    font-weight: 600;
-  }
-  
-  .subTitle {
-    margin-top: 4px;
-    opacity: 0.75;
-  }
-  
-  /* Stats */
-  .statsGrid {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(140px, 1fr));
-    gap: 10px;
-    margin-bottom: 14px;
-  }
-  
-  @media (max-width: 980px) {
-    .statsGrid {
-      grid-template-columns: repeat(2, minmax(140px, 1fr));
-    }
-  }
-  
-  .statCard {
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    border-radius: 12px;
-    padding: 10px 12px;
-  }
-  
-  .statLabel {
-    font-size: 12px;
-    opacity: 0.7;
-  }
-  
-  .statValue {
-    font-size: 20px;
-    font-weight: 700;
-    margin-top: 4px;
-  }
-  
-  .statSub {
-    margin-top: 2px;
-    font-size: 12px;
-    opacity: 0.7;
-  }
-  
-  /* Trend badge */
-  .trendBadge {
-    border: 1px solid rgba(0, 0, 0, 0.12);
-    border-radius: 999px;
-    padding: 6px 10px;
-    font-size: 12px;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    user-select: none;
-  }
-  
-  .trendSymbol {
-    font-weight: 800;
-  }
-  
-  .trend_up {
-    opacity: 0.95;
-  }
-  .trend_down {
-    opacity: 0.95;
-  }
-  .trend_flat {
-    opacity: 0.75;
-  }
-  
-  /* Charts */
-  .chartBlock {
-    margin-top: 14px;
-  }
-  
-  /* Tooltip */
-  .tooltip {
-    background: white;
-    border: 1px solid rgba(0, 0, 0, 0.12);
-    border-radius: 10px;
-    padding: 10px 12px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
-  }
-  
-  .tooltipDate {
-    font-weight: 700;
-    margin-bottom: 6px;
-  }
-  
-  .tooltipRow {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    font-size: 13px;
-  }
-  
-  /* Legend */
-  .legendRow {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    margin-top: 8px;
-    font-size: 12px;
-    opacity: 0.85;
-  }
-  
-  .legendItem {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-  }
-  
-  .swatchSolid {
-    width: 18px;
-    height: 0;
-    border-top: 3px solid currentColor;
-    display: inline-block;
-  }
-  
-  .swatchDash7 {
-    width: 18px;
-    height: 0;
-    border-top: 3px dashed currentColor;
-    display: inline-block;
-  }
-  
-  .swatchDash30 {
-    width: 18px;
-    height: 0;
-    border-top: 3px dashed currentColor;
-    display: inline-block;
-    opacity: 0.7;
-  }
-  
-  .swatchGoal {
-    width: 18px;
-    height: 0;
-    border-top: 3px dashed rgba(0, 0, 0, 0.35);
-    display: inline-block;
-  }
-  
+.fitbitBlock {
+  width: 100%;
+}
+
+.chartWrap {
+  width: 100%;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.tooltip {
+  padding: 10px 14px;
+  border-radius: 12px;
+
+  background: var(--tt-bg, rgba(255, 255, 255, 0.9));
+  color: var(--tt-text, #0f172a);
+
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--tt-border, rgba(0, 0, 0, 0.06));
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+
+  font-size: 13px;
+}
+
+.tooltipDate {
+  font-size: 12px;
+  opacity: 0.65;
+  margin-bottom: 4px;
+}
+
+.tooltipValue {
+  font-size: 18px;
+  font-weight: 700;
+  color: inherit;
+}

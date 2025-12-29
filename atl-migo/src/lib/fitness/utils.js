@@ -323,30 +323,20 @@ export function groupExercisesBySplit(exerciseIndex, exerciseQuery = "") {
 export function buildTrendData(fitbitRange, metric) {
   if (!fitbitRange || !metric) return [];
 
-  const key = metric === "sleepScore" ? "sleepQualityScore" : metric;
-
-  if (Array.isArray(fitbitRange)) {
-    return fitbitRange
-      .map((d) => {
-        const date = d?.date ?? null;
-        const v = Number(d?.[key]);
-        return { date, value: Number.isFinite(v) ? v : null };
-      })
-      .filter((p) => !!p.date)
-      .sort((a, b) => String(a.date).localeCompare(String(b.date)));
-  }
-
-  const series = fitbitRange?.[key];
+  const series = fitbitRange?.[metric];
   if (!Array.isArray(series)) return [];
 
   return series
     .map((p) => {
       const date = p?.date ?? null;
       const v = Number(p?.value);
-      return { date, value: Number.isFinite(v) ? v : null };
+      return {
+        date,
+        value: Number.isFinite(v) ? v : null,
+      };
     })
-    .filter((p) => !!p.date)
-    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    .filter((p) => p.date)
+    .sort((a, b) => a.date.localeCompare(b.date));
 }
 
 export function getExtremes(points, better = "higher") {
