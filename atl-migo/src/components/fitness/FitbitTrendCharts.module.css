@@ -3,6 +3,8 @@
 }
 
 .chartWrap {
+  height: 240px;
+  min-width: 0;
   width: 100%;
   border-radius: 14px;
   overflow: hidden;
@@ -12,14 +14,17 @@
   padding: 10px 14px;
   border-radius: 12px;
 
-  background: var(--tt-bg, rgba(255, 255, 255, 0.9));
-  color: var(--tt-text, #0f172a);
+  background: var(--tt-bg);
+  color: var(--tt-text);
 
+  -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
-  border: 1px solid var(--tt-border, rgba(0, 0, 0, 0.06));
+
+  border: 1px solid var(--tt-border);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
 
   font-size: 13px;
+  user-select: none;
 }
 
 .tooltipDate {

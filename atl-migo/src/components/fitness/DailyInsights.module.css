@@ -1,0 +1,152 @@
+.card {
+  border-radius: 16px;
+  padding: 14px 14px 12px;
+
+  /* keep the glass look, but let the parent theme decide text color */
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+
+  /* ✅ THIS is the important part */
+  color: var(--insightFg, rgba(15, 23, 42, 0.92));
+
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+.topRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.kicker {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.meta {
+  font-size: 12px;
+  color: var(--insightMuted, rgba(15, 23, 42, 0.65));
+  white-space: nowrap;
+}
+
+.headline {
+  font-size: 14px;
+  line-height: 1.35;
+  margin-bottom: 10px;
+}
+
+.grid {
+  display: grid;
+  gap: 8px;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.label {
+  font-size: 12px;
+  color: var(--insightMuted, rgba(15, 23, 42, 0.65));
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  /* optional: prevents long labels from wrapping weird */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.value {
+  font-size: 12px;
+  opacity: 0.95;
+  text-align: right;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.note {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--insightMuted, rgba(15, 23, 42, 0.65));
+}
+.rightMeta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sparkWrap {
+  width: 120px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid var(--stroke);
+  background: rgba(255, 255, 255, 0.35);
+  overflow: hidden;
+}
+
+:global(.dark) .sparkWrap,
+.fitnessWrap.dark .sparkWrap {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.sparkSvg {
+  width: 120px;
+  height: 32px;
+  display: block;
+}
+
+.sparkLine {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.9;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--stroke);
+  background: var(--panelInset);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.chipIcon {
+  font-weight: 900;
+}
+
+.chipText {
+  opacity: 0.92;
+}
+
+.chipUp {
+  border-color: rgba(34, 197, 94, 0.35);
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.12);
+}
+
+.chipDown {
+  border-color: rgba(239, 68, 68, 0.35);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.10);
+}
+
+.chipFlat {
+  border-color: rgba(148, 163, 184, 0.35);
+  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.10);
+}

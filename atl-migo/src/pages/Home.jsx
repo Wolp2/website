@@ -16,7 +16,7 @@ export default function Home() {
             <div className="intro-text">
               <h1>Welcome to My Website</h1>
               <p>
-                My name is William, I am a software engineer student and this is a personal project to share my work, ideas, and fitness journey.
+                My name is William, I am a software engineer student and this is a personal project to share my work and ideas.
               </p>
               <nav className="hero-nav">
                 <a href="/Fitness">Fitness</a>

@@ -42,3 +42,61 @@
   background: #fff;
   color: #111;
 }
+
+:root {
+  /* --- surfaces --- */
+  --bg: #f4f7fb;
+  --panel: rgba(255, 255, 255, 0.74);   /* main cards */
+  --panel-2: rgba(255, 255, 255, 0.88); /* inner surfaces */
+  --stroke: rgba(10, 20, 40, 0.10);
+  --stroke-strong: rgba(10, 20, 40, 0.14);
+
+  /* --- text --- */
+  --fg: rgba(10, 18, 28, 0.92);
+  --muted: rgba(10, 18, 28, 0.62);
+  --muted-2: rgba(10, 18, 28, 0.48);
+
+  /* --- effects --- */
+  --shadow: 0 14px 34px rgba(10, 18, 28, 0.10);
+  --shadow-soft: 0 10px 22px rgba(10, 18, 28, 0.08);
+
+  /* --- radius & spacing --- */
+  --r-lg: 18px;
+  --r-md: 14px;
+
+  /* --- accents (use these lightly) --- */
+  --a-steps: #29d39b;
+  --a-cal: #f6d44a;
+  --a-rhr: #6ee7ff;
+  --a-sleep: #a78bfa;
+  --a-danger: #ef4444;
+  --a-warn: #f59e0b;
+  --a-ok: #22c55e;
+
+  /* --- motion --- */
+  --t-fast: 160ms;
+  --t-med: 220ms;
+  --ease: cubic-bezier(.2,.8,.2,1);
+}
+
+/* dark theme: apply via <html data-theme="dark"> or body */
+:root[data-theme="dark"] {
+  --bg: #060a12;
+  --panel: rgba(255, 255, 255, 0.06);
+  --panel-2: rgba(255, 255, 255, 0.085);
+  --stroke: rgba(255, 255, 255, 0.12);
+  --stroke-strong: rgba(255, 255, 255, 0.16);
+
+  --fg: rgba(255, 255, 255, 0.92);
+  --muted: rgba(255, 255, 255, 0.68);
+  --muted-2: rgba(255, 255, 255, 0.52);
+
+  --shadow: 0 18px 42px rgba(0, 0, 0, 0.40);
+  --shadow-soft: 0 12px 28px rgba(0, 0, 0, 0.34);
+}
+
+/* global baseline */
+html, body {
+  background: var(--bg);
+  color: var(--fg);
+}

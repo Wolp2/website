@@ -9,7 +9,7 @@ export default function FitnessControlBar({
   metric,
   onMetric,
   onJumpToToday,
-  onToolbarHeight, // NEW
+  onToolbarHeight,
 }) {
   const surfaceRef = useRef(null);
   const [elevated, setElevated] = useState(false);
@@ -45,11 +45,32 @@ export default function FitnessControlBar({
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  const setRangeSafe = (v) => {
+    // keep rangeDays consistent as strings: "daily" | "7" | "30" | "90"
+    if (v === "daily") return onRangeDays?.("daily");
+    const n = Math.max(7, Math.min(90, parseInt(String(v), 10)));
+    onRangeDays?.(String(n));
+  };
+
+  const quickMetrics = [
+    ["steps", "Steps"],
+    ["caloriesOut", "Calories"],
+    ["restingHeartRate", "Resting HR"],
+    ["sleepQualityScore", "Sleep"],
+    ["hrvDailyRmssd", "HRV"],
+  ];
+
   return (
     <div className={styles.stickyBar}>
       <div
         ref={surfaceRef}
-        className={`${styles.stickySurface} ${elevated ? styles.stickyShadow : ""}`}
+        className={[
+          styles.stickySurface,
+          styles.elevHigh, // ✅ use elevation tier
+          elevated ? styles.stickyShadow : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
       >
         <div className={styles.controlsRow}>
           <div className={styles.controlsGroup}>
@@ -59,7 +80,7 @@ export default function FitnessControlBar({
                 className={styles.input}
                 type="date"
                 value={selectedISO}
-                onChange={(e) => onSelectedISO(e.target.value)}
+                onChange={(e) => onSelectedISO?.(e.target.value)}
               />
             </label>
 
@@ -68,16 +89,12 @@ export default function FitnessControlBar({
               <select
                 className={styles.select}
                 value={String(rangeDays)}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (v === "daily") return onRangeDays("daily");
-                  onRangeDays(Math.max(7, Math.min(90, parseInt(v, 10))));
-                }}
+                onChange={(e) => setRangeSafe(e.target.value)}
               >
                 <option value="daily">Daily</option>
-                <option value={7}>7 days</option>
-                <option value={30}>30 days</option>
-                <option value={90}>90 days</option>
+                <option value="7">7 days</option>
+                <option value="30">30 days</option>
+                <option value="90">90 days</option>
               </select>
             </label>
 
@@ -86,12 +103,13 @@ export default function FitnessControlBar({
               <select
                 className={styles.select}
                 value={metric}
-                onChange={(e) => onMetric(e.target.value)}
+                onChange={(e) => onMetric?.(e.target.value)}
               >
                 <option value="steps">Steps</option>
                 <option value="caloriesOut">Calories Out</option>
                 <option value="restingHeartRate">Resting HR</option>
                 <option value="sleepQualityScore">Sleep Quality</option>
+                <option value="hrvDailyRmssd">HRV (RMSSD)</option>
               </select>
             </label>
           </div>
@@ -99,6 +117,25 @@ export default function FitnessControlBar({
           <button className={styles.btn} onClick={onJumpToToday}>
             Jump to Today
           </button>
+        </div>
+
+        {/* ✅ Quick metric pills row */}
+        <div className={styles.quickRow}>
+          {quickMetrics.map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              className={[
+                styles.pillBtn,
+                metric === key ? styles.activePill : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              onClick={() => onMetric?.(key)}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       </div>
     </div>

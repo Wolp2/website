@@ -10,13 +10,19 @@ export function clamp(n, a, b) {
   return Math.max(a, Math.min(b, n));
 }
 
+/** Normalized split labels for UI */
 export const splitLabel = (k) =>
-  k === "push" ? "Push" : k === "pull" ? "Pull" : k === "legs" ? "Legs" : "Other";
+  k === "all" ? "All" :
+  k === "push" ? "Push" :
+  k === "pull" ? "Pull" :
+  k === "legs" ? "Legs" : "Other";
 
+/** Local ISO date (YYYY-MM-DD) using local time (not UTC). */
 export function toISODateLocal(d) {
-  const yr = d.getFullYear();
-  const mo = String(d.getMonth() + 1).padStart(2, "0");
-  const da = String(d.getDate()).padStart(2, "0");
+  const dt = new Date(d);
+  const yr = dt.getFullYear();
+  const mo = String(dt.getMonth() + 1).padStart(2, "0");
+  const da = String(dt.getDate()).padStart(2, "0");
   return `${yr}-${mo}-${da}`;
 }
 
@@ -24,18 +30,46 @@ export function fmtDatePretty(iso) {
   if (!iso) return "—";
   const [y, m, d] = iso.split("-").map(Number);
   const dt = new Date(y, (m || 1) - 1, d || 1);
-  return dt.toLocaleDateString(undefined, { month: "short", day: "2-digit", year: "numeric" });
+  return dt.toLocaleDateString(undefined, {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+  });
 }
 
+/**
+ * Parse M/D/Y or M-D-Y into a Date.
+ * Returns null if invalid or out-of-range (prevents JS date rollover).
+ */
 export function parseMDY(str) {
   const t = trim(str);
   if (!t) return null;
+
   const m = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/.exec(t);
   if (!m) return null;
-  let [, mm, dd, yy] = m.map(Number);
+
+  let mm = Number(m[1]);
+  let dd = Number(m[2]);
+  let yy = Number(m[3]);
+
+  if (!Number.isFinite(mm) || !Number.isFinite(dd) || !Number.isFinite(yy)) return null;
   if (yy < 100) yy += yy >= 70 ? 1900 : 2000;
-  const d = new Date(yy, mm - 1, dd);
-  return Number.isNaN(+d) ? null : d;
+
+  // quick range checks
+  if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
+
+  const dt = new Date(yy, mm - 1, dd);
+
+  // prevent rollover (e.g. 2/31 -> 3/3)
+  if (
+    dt.getFullYear() !== yy ||
+    dt.getMonth() !== mm - 1 ||
+    dt.getDate() !== dd
+  ) {
+    return null;
+  }
+
+  return dt;
 }
 
 /**
@@ -54,7 +88,7 @@ export function col(headers, aliases) {
     if (idx !== -1) return idx;
 
     // partial match
-    idx = hs.findIndex((h) => h === target || h.startsWith(target) || h.includes(target));
+    idx = hs.findIndex((h) => h === target || h.startsWith(target));
     if (idx !== -1) return idx;
   }
 
@@ -137,6 +171,7 @@ export function normalizeExerciseName(name) {
   return s.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+/** Normalize split into push/pull/legs/other */
 export function normalizeSplit(category, exerciseName) {
   const cat = trim(category).toLowerCase();
   const ex = trim(exerciseName).toLowerCase();
@@ -161,8 +196,7 @@ export function normalizeSplit(category, exerciseName) {
     ex.includes("hamstring") ||
     ex.includes("quad") ||
     ex.includes("hip thrust")
-  )
-    return "legs";
+  ) return "legs";
 
   if (
     ex.includes("row") ||
@@ -174,8 +208,7 @@ export function normalizeSplit(category, exerciseName) {
     ex.includes("rear delt") ||
     ex.includes("shrug") ||
     ex.includes("curl")
-  )
-    return "pull";
+  ) return "pull";
 
   if (
     ex.includes("bench") ||
@@ -188,10 +221,21 @@ export function normalizeSplit(category, exerciseName) {
     ex.includes("skull crusher") ||
     ex.includes("lateral raise") ||
     ex.includes("tricep")
-  )
-    return "push";
+  ) return "push";
 
   return "other";
+}
+
+/** UI-friendly PPL label from a raw value (sheet) */
+export function normalizePPLLabel(raw) {
+  const s = trim(raw).toLowerCase();
+  if (!s) return "Other";
+  if (s.includes("push")) return "Push";
+  if (s.includes("pull")) return "Pull";
+  if (s.includes("leg")) return "Legs";
+  if (s === "p") return "Push";
+  if (s === "l") return "Legs";
+  return "Other";
 }
 
 export function parseWeightLbs(w) {
@@ -226,14 +270,13 @@ export function buildLiftsByISO(csvOrRows) {
   const cWt = col(headers, ["weight", "load", "lbs"]);
   const cSets = col(headers, ["sets"]);
   const cReps = col(headers, ["reps"]);
-  const cMi = col(headers, ["miles", "distance(mi)", "distance(mi)", "distance", "distance mi"]);
+  const cMi = col(headers, ["miles", "distance(mi)", "distance", "distance mi"]);
   const cMin = col(headers, ["minutes", "duration(min)", "duration", "time"]);
   const cNotes = col(headers, ["notes", "comments", "note"]);
 
   const entries = [];
 
   for (const r of body) {
-    // Skip totally blank rows
     if (!r || r.every((c) => trim(c) === "")) continue;
 
     const dateCell = cDate >= 0 ? trim(r[cDate]) : "";
@@ -243,7 +286,7 @@ export function buildLiftsByISO(csvOrRows) {
     const exerciseRaw = cEx >= 0 ? trim(r[cEx]) : "";
     if (!exerciseRaw) continue;
 
-    // If you *want* cardio later, remove this block and create a cardio feed
+    // If you want cardio later, remove this block and create a cardio feed.
     const miles = cMi >= 0 ? trim(r[cMi]) : "";
     const minutes = cMin >= 0 ? trim(r[cMin]) : "";
     if (miles || minutes) continue;
@@ -251,10 +294,18 @@ export function buildLiftsByISO(csvOrRows) {
     const category = cCat >= 0 ? trim(r[cCat]) : "";
     const exercise = normalizeExerciseName(exerciseRaw);
 
+    // ✅ split fields (raw + normalized display label)
+    const splitKey = normalizeSplit(category, exercise); // push/pull/legs/other
+    const split = splitLabel(splitKey); // Push/Pull/Legs/Other
+
     entries.push({
       date: dt,
       iso: toISODateLocal(dt),
+
       category,
+      splitKey,
+      split,
+
       exercise,
       weight: cWt >= 0 ? trim(r[cWt]) : "",
       sets: cSets >= 0 ? trim(r[cSets]) : "",
@@ -321,19 +372,13 @@ export function groupExercisesBySplit(exerciseIndex, exerciseQuery = "") {
 }
 
 export function buildTrendData(fitbitRange, metric) {
-  if (!fitbitRange || !metric) return [];
+  if (!Array.isArray(fitbitRange) || !metric) return [];
 
-  const series = fitbitRange?.[metric];
-  if (!Array.isArray(series)) return [];
-
-  return series
-    .map((p) => {
-      const date = p?.date ?? null;
-      const v = Number(p?.value);
-      return {
-        date,
-        value: Number.isFinite(v) ? v : null,
-      };
+  return fitbitRange
+    .map((d) => {
+      const date = d?.date ?? null;
+      const v = Number(d?.[metric]);
+      return { date, value: Number.isFinite(v) ? v : null };
     })
     .filter((p) => p.date)
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -349,4 +394,32 @@ export function getExtremes(points, better = "higher") {
   const best = better === "lower" ? minP : maxP;
   const worst = better === "lower" ? maxP : minP;
   return { best, worst, min: minP, max: maxP };
+}
+
+// ===== Counterfactual / Insight Helpers =====
+export function getInsightMode(now = new Date()) {
+  const h = now.getHours();
+  if (h < 10) return "reflection"; // morning
+  if (h < 17) return "pacing"; // midday
+  return "wrap"; // evening
+}
+
+export function mean(nums) {
+  const xs = (nums || []).map(Number).filter((n) => Number.isFinite(n));
+  if (!xs.length) return null;
+  return xs.reduce((a, b) => a + b, 0) / xs.length;
+}
+
+export function fmtInt(n) {
+  return n == null || Number.isNaN(Number(n))
+    ? "—"
+    : Math.round(Number(n)).toLocaleString();
+}
+
+export function fmtMins(m) {
+  if (m == null || !Number.isFinite(Number(m))) return "—";
+  const n = Math.round(Number(m));
+  const h = Math.floor(n / 60);
+  const mm = n % 60;
+  return h > 0 ? `${h}h ${mm}m` : `${mm}m`;
 }

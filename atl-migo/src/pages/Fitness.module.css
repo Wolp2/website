@@ -3,6 +3,9 @@
    ========================================================= */
 
 .fitnessWrap {
+  --insightFg: rgba(15, 23, 42, 0.92);
+  --insightMuted: rgba(15, 23, 42, 0.65);
+
   --tileStepsBg: linear-gradient(
     90deg,
     rgba(255, 255, 255, 0.92) 0%,
@@ -23,6 +26,7 @@
     rgba(255, 255, 255, 0.92) 0%,
     rgba(196, 181, 253, 0.55) 100%
   );
+
   --bg: #e9efea;
   --text: #0f172a;
   --muted: rgba(15, 23, 42, 0.55);
@@ -33,7 +37,29 @@
   --panel: rgba(255, 255, 255, 0.78);
   --panel2: rgba(255, 255, 255, 0.6);
 
+  /* Surface tiers (used by child components) */
+  --surface-1: var(--card);   /* main cards */
+  --surface-2: var(--panel);  /* inset panels */
+  --surface-3: var(--panel2); /* subtle insets */
+
+  /* Stroke tiers + raised/inset surfaces */
+  --stroke: rgba(15, 23, 42, 0.10);
+  --strokeStrong: rgba(15, 23, 42, 0.14);
+  --panelRaised: rgba(255, 255, 255, 0.86);
+  --panelInset: rgba(255, 255, 255, 0.70);
+
+  /* Focus ring */
+  --ring: rgba(59, 130, 246, 0.35);
+
+  /* Tooltip defaults (charts) */
+  --tt-bg: rgba(255, 255, 255, 0.92);
+  --tt-text: rgba(15, 23, 42, 0.92);
+  --tt-border: rgba(15, 23, 42, 0.10);
+
+  /* dividers */
   --line: rgba(15, 23, 42, 0.1);
+
+  /* shadows */
   --shadow: 0 18px 50px rgba(15, 23, 42, 0.1);
 
   --controlBg: rgba(255, 255, 255, 0.92);
@@ -42,20 +68,31 @@
   --accent: #16a34a;
   --accent-soft: rgba(22, 163, 74, 0.15);
 
+  /* Optional accents for echoes / progress bars */
+  --aSteps: #29d39b;
+  --aOk: #22c55e;
+  --aWarn: #f59e0b;
+  --aBad: #ef4444;
+
   --radius: 18px;
   --radiusSm: 14px;
 
   --stickyTop: 12px;
+
+  /* motion */
+  --tFast: 160ms;
+  --tMed: 220ms;
+  --ease: cubic-bezier(.2,.8,.2,1);
 
   color-scheme: light;
 
   background:
     repeating-linear-gradient(
       135deg,
-      rgba(255, 255, 255, 0.22) 0px,
-      rgba(255, 255, 255, 0.22) 2px,
+      rgba(255, 255, 255, 0.14) 0px,
+      rgba(255, 255, 255, 0.14) 2px,
       rgba(255, 255, 255, 0) 2px,
-      rgba(255, 255, 255, 0) 22px
+      rgba(255, 255, 255, 0) 28px
     ),
     radial-gradient(900px 520px at 12% 12%, rgba(167, 243, 208, 0.45), transparent 60%),
     radial-gradient(900px 520px at 88% 10%, rgba(147, 197, 253, 0.35), transparent 55%),
@@ -67,6 +104,9 @@
 }
 
 .fitnessWrap.dark {
+  --insightFg: rgba(226, 232, 240, 0.92);
+  --insightMuted: rgba(226, 232, 240, 0.70);
+
   --tileStepsBg: linear-gradient(
     135deg,
     rgba(59, 130, 246, 0.22) 0%,
@@ -91,6 +131,7 @@
     rgba(15, 23, 42, 0.78) 55%,
     rgba(2, 6, 23, 0.92) 100%
   );
+
   --bg: #070b12;
   --bg-grad-1: rgba(59, 130, 246, 0.1);
   --bg-grad-2: rgba(16, 185, 129, 0.08);
@@ -101,10 +142,31 @@
   --panel: rgba(15, 23, 42, 0.55);
   --panel2: rgba(15, 23, 42, 0.4);
 
+  /* Surface tiers (used by child components) */
+  --surface-1: var(--card);   /* main cards */
+  --surface-2: var(--panel);  /* inset panels */
+  --surface-3: var(--panel2); /* subtle insets */
+
+  /* Stroke tiers + raised/inset surfaces */
+  --stroke: rgba(148, 163, 184, 0.18);
+  --strokeStrong: rgba(148, 163, 184, 0.24);
+  --panelRaised: rgba(15, 23, 42, 0.62);
+  --panelInset: rgba(15, 23, 42, 0.48);
+
+  /* Focus ring */
+  --ring: rgba(59, 130, 246, 0.35);
+
+  /* Tooltip defaults (charts) */
+  --tt-bg: rgba(2, 6, 23, 0.72);
+  --tt-text: rgba(226, 232, 240, 0.94);
+  --tt-border: rgba(148, 163, 184, 0.22);
+
   --text: #e5e7eb;
   --muted: rgba(229, 231, 235, 0.72);
 
+  /* dividers */
   --line: rgba(148, 163, 184, 0.18);
+
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
 
   --controlBg: rgba(2, 6, 23, 0.55);
@@ -117,6 +179,14 @@
     radial-gradient(800px 500px at 90% 10%, var(--bg-grad-2) 0%, transparent 55%),
     linear-gradient(180deg, #060a12 0%, var(--bg) 60%);
 }
+
+/* =========================================================
+   ELEVATION TIERS (utility)
+   ========================================================= */
+
+.elevHigh { box-shadow: 0 20px 55px rgba(0,0,0,0.55); }
+.elevMid  { box-shadow: 0 14px 36px rgba(0,0,0,0.35); }
+.elevBase { box-shadow: var(--shadow); }
 
 /* =========================================================
    LAYOUT
@@ -145,9 +215,7 @@
 }
 
 @media (max-width: 980px) {
-  .topGrid {
-    grid-template-columns: 1fr;
-  }
+  .topGrid { grid-template-columns: 1fr; }
 }
 
 .tilesStack {
@@ -166,8 +234,96 @@
 }
 
 .dot {
-  opacity: 0.4;
-  margin: 0 2px;
+  opacity: 0.45;
+  margin: 0 6px;
+}
+
+/* =========================================================
+   TYPOGRAPHY POLISH
+   ========================================================= */
+
+.metricNums,
+.tileValue,
+.bigNumber,
+.scoreNum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* =========================================================
+   REUSABLE ACTIVE EMPHASIS (single source of truth)
+   ========================================================= */
+
+.activePill {
+  border-color: rgba(34, 197, 94, 0.35) !important;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.14);
+}
+
+/* =========================================================
+   CARD PRIMITIVES (optional usage from JSX)
+   ========================================================= */
+
+.card {
+  background: var(--panelRaised);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition:
+    transform var(--tFast) var(--ease),
+    box-shadow var(--tFast) var(--ease),
+    border-color var(--tFast) var(--ease),
+    background var(--tFast) var(--ease);
+}
+
+.card:hover {
+  transform: translateY(-1px);
+  border-color: var(--strokeStrong);
+}
+
+.cardInner {
+  background: var(--panelInset);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radiusSm);
+}
+
+.heroCard { border-color: rgba(34, 197, 94, 0.35); }
+
+.fitnessWrap.dark .heroCard {
+  box-shadow: var(--shadow), 0 0 28px rgba(34, 197, 94, 0.12);
+}
+
+/* Subtle re-render animation (wrap grid in a keyed div) */
+.fadeSwap { animation: fadeSwap var(--tMed) var(--ease); }
+@keyframes fadeSwap {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Progress bar helpers (Trends) */
+.progressTrack {
+  height: 8px;
+  border-radius: 999px;
+  border: 1px solid var(--stroke);
+  overflow: hidden;
+  background: rgba(10, 18, 28, 0.06);
+}
+.fitnessWrap.dark .progressTrack { background: rgba(255, 255, 255, 0.10); }
+
+.progressFill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--aOk);
+  transform-origin: left;
+  transition: transform var(--tMed) var(--ease);
+}
+
+/* Optional tiny “chip panel” */
+.sparklineWrap {
+  background: var(--surface-3);
+  border: 1px solid var(--stroke);
+  border-radius: 12px;
+  padding: 6px 10px;
 }
 
 /* =========================================================
@@ -184,15 +340,9 @@
   margin: 10px 0 14px;
 
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.55);
+  background: linear-gradient(180deg, var(--panel), var(--panel2));
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.55);
-}
-
-/* FIX: module-safe dark selector */
-.fitnessWrap.dark .fitnessHeader {
-  background: rgba(20, 20, 24, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--stroke);
 }
 
 .pageTitle {
@@ -209,7 +359,6 @@
     0 10px 30px rgba(0, 0, 0, 0.08);
 }
 
-/* FIX: module-safe dark selector */
 .fitnessWrap.dark .pageTitle {
   color: rgba(255, 255, 255, 0.9);
   text-shadow:
@@ -245,34 +394,22 @@
   display: grid;
   place-items: center;
 
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid var(--controlBorder);
+  background: var(--controlBg);
   backdrop-filter: blur(10px);
 
   cursor: pointer;
   transition: transform 0.12s ease, background 0.12s ease;
 }
 
-/* FIX: module-safe dark selector */
-.fitnessWrap.dark .darkToggle {
-  background: rgba(20, 20, 24, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-.darkToggle:hover {
-  transform: scale(1.03);
-}
-.darkToggle:active {
-  transform: scale(0.97);
-}
+.darkToggle:hover { transform: scale(1.03); }
+.darkToggle:active { transform: scale(0.97); }
 
 /* =========================================================
    STATUS BADGES
    ========================================================= */
 
-.statusBanner {
-  margin: 0;
-}
+.statusBanner { margin: 0; }
 
 .statusOk {
   display: inline-flex;
@@ -286,7 +423,6 @@
   color: #0f7a33;
   background: rgba(22, 163, 74, 0.12);
 }
-
 .statusOk::before {
   content: "";
   width: 8px;
@@ -295,7 +431,6 @@
   background: #16a34a;
 }
 
-/* FIX: module-safe dark selector */
 .fitnessWrap.dark .statusOk {
   color: #7ee2a8;
   background: rgba(22, 163, 74, 0.16);
@@ -312,7 +447,6 @@
   color: #b91c1c;
   background: rgba(220, 38, 38, 0.12);
 }
-
 .statusErr::before {
   content: "";
   width: 8px;
@@ -327,19 +461,27 @@
 
 .panel,
 .table,
-.info,
-.stickySurface,
-.exerciseBar {
+.info {
   background: var(--card);
-  border: 1px solid var(--line);
+  border: 1px solid var(--stroke);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  transition: border-color var(--tFast) var(--ease), transform var(--tFast) var(--ease);
+}
+
+.panel:hover,
+.table:hover,
+.info:hover {
+  border-color: var(--strokeStrong);
 }
 
 .panel {
   padding: 1rem;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .info {
@@ -349,9 +491,10 @@
 
 .error {
   border-color: rgba(248, 113, 113, 0.45);
-  background: rgba(248, 113, 113, 0.1);
-  color: #fecaca;
+  background: rgba(248, 113, 113, 0.12);
+  color: #7f1d1d;
 }
+.fitnessWrap.dark .error { color: #fecaca; }
 
 /* =========================================================
    STICKY TOOLBAR / CONTROLS
@@ -365,10 +508,17 @@
 }
 
 .stickySurface {
+  background: linear-gradient(180deg, var(--panel), var(--panel2));
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   padding: 1rem;
   box-shadow: none;
-  background: linear-gradient(180deg, var(--panel), var(--panel2));
+  transition: border-color var(--tFast) var(--ease);
 }
+
+.stickySurface:hover { border-color: var(--strokeStrong); }
 
 .stickyShadow {
   box-shadow:
@@ -391,15 +541,8 @@
   align-items: end;
 }
 
-.field {
-  display: grid;
-  gap: 6px;
-}
-
-.fieldLabel {
-  font-size: 12px;
-  opacity: 0.75;
-}
+.field { display: grid; gap: 6px; }
+.fieldLabel { font-size: 12px; opacity: 0.75; }
 
 .input,
 .select {
@@ -411,19 +554,28 @@
   color: var(--text);
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
   box-sizing: border-box;
-
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-  background-image: none;
+  transition: border-color var(--tFast) var(--ease), box-shadow var(--tFast) var(--ease);
 }
 
+.input:focus,
+.select:focus {
+  outline: none;
+  border-color: rgba(34, 197, 94, 0.45);
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.14), 0 8px 20px rgba(15, 23, 42, 0.06);
+}
+
+/* Keep native date behaviors */
 .input[type="date"] {
   padding-top: 0;
   padding-bottom: 0;
 }
 
+/* Only select gets custom appearance + arrow */
 .select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+
   padding-right: 42px;
   background-repeat: no-repeat;
   background-position: right 14px center;
@@ -439,7 +591,6 @@
   background: #ffffff;
   color: #0f172a;
 }
-
 .fitnessWrap.dark .select option {
   background: #0b1220;
   color: #e5e7eb;
@@ -454,7 +605,11 @@
   border-radius: 12px;
   padding: 10px 12px;
   cursor: pointer;
+  transition: transform 0.12s ease, border-color var(--tFast) var(--ease);
 }
+
+.btn:hover,
+.linkBtn:hover { border-color: var(--strokeStrong); }
 
 .linkBtn {
   border-radius: 10px;
@@ -463,14 +618,39 @@
 }
 
 .btn:active,
-.linkBtn:active {
-  transform: translateY(1px);
-}
+.linkBtn:active { transform: translateY(1px); }
 
 .btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
+
+/* =========================================================
+   QUICK METRIC PILLS (Control Bar)
+   ========================================================= */
+
+.quickRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.pillBtn {
+  appearance: none;
+  border: 1px solid var(--controlBorder);
+  background: var(--controlBg);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 8px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  line-height: 1;
+  transition: transform 0.12s ease, border-color var(--tFast) var(--ease);
+}
+
+.pillBtn:hover { border-color: var(--strokeStrong); }
+.pillBtn:active { transform: translateY(1px); }
 
 /* =========================================================
    SECTION HEADERS + CHART AREA
@@ -491,10 +671,7 @@
   font-weight: 800;
 }
 
-.sectionMeta {
-  font-size: 12px;
-  opacity: 0.75;
-}
+.sectionMeta { font-size: 12px; opacity: 0.75; }
 
 .chartHead {
   display: flex;
@@ -511,15 +688,16 @@
   font-weight: 900;
 }
 
-.chartMeta {
-  font-size: 12px;
-  opacity: 0.75;
-}
+.chartMeta { font-size: 12px; opacity: 0.75; }
 
 .chartBox {
   margin-top: 10px;
-  /* IMPORTANT: do NOT set color here (it can tint tooltip/labels) */
+  min-width: 0;
+  flex: 1;
+  min-height: 245px;
 }
+
+.chartBox > * { height: 100%; }
 
 /* =========================================================
    TILES
@@ -533,31 +711,29 @@
 }
 
 @media (max-width: 520px) {
-  .tileGrid {
-    grid-template-columns: 1fr;
-  }
+  .tileGrid { grid-template-columns: 1fr; }
 }
 
 .tile {
   min-height: 128px;
   border-radius: var(--radius);
-  border: 1px solid var(--line);
+  border: 1px solid var(--stroke);
   box-shadow: var(--shadow);
   padding: 14px;
+  transition:
+    transform var(--tFast) var(--ease),
+    box-shadow var(--tFast) var(--ease),
+    border-color var(--tFast) var(--ease);
 }
 
-.tileClickable {
-  cursor: pointer;
-  transition: transform 120ms ease, box-shadow 120ms ease;
-}
+.tileClickable { cursor: pointer; }
 
 .tileClickable:hover {
   transform: translateY(-1px);
+  border-color: var(--strokeStrong);
 }
 
-.tileClickable:active {
-  transform: translateY(0px);
-}
+.tileClickable:active { transform: translateY(0px); }
 
 .tileActive {
   outline: 2px solid rgba(22, 163, 74, 0.35);
@@ -600,37 +776,32 @@
   display: grid;
   place-items: center;
 
-  background: rgba(255, 255, 255, 0.55);
-  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(15, 23, 42, 0.12);
   box-shadow: 0 10px 22px rgba(15, 23, 42, 0.1);
   color: rgba(15, 23, 42, 0.7);
 }
 
-/* Light gradients */
 .tileSteps { background: var(--tileStepsBg); }
 .tileCalories { background: var(--tileCaloriesBg); }
 .tileRhr { background: var(--tileRhrBg); }
 .tileSleep { background: var(--tileSleepBg); }
 
-/* Dark tiles */
+.metricActive {
+  outline: 2px solid rgba(22, 163, 74, 0.35);
+  box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.12);
+}
+
 .fitnessWrap.dark .tile {
-  border-color: rgba(148, 163, 184, 0.18);
+  border-color: var(--stroke);
   box-shadow:
     0 18px 50px rgba(0, 0, 0, 0.50),
     0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
-.fitnessWrap.dark .tileTitle {
-  color: rgba(229, 231, 235, 0.78);
-}
-
-.fitnessWrap.dark .tileValue {
-  color: rgba(255, 255, 255, 0.92);
-}
-
-.fitnessWrap.dark .tileSub {
-  color: rgba(229, 231, 235, 0.7);
-}
+.fitnessWrap.dark .tileTitle { color: rgba(229, 231, 235, 0.78); }
+.fitnessWrap.dark .tileValue { color: rgba(255, 255, 255, 0.92); }
+.fitnessWrap.dark .tileSub { color: rgba(229, 231, 235, 0.7); }
 
 .fitnessWrap.dark .tileIconBubble {
   background: rgba(2, 6, 23, 0.4);
@@ -650,15 +821,9 @@
   margin-top: 12px;
 }
 
-.liftCard {
-  border-radius: 14px;
-  padding: 12px;
-}
+.liftCard { border-radius: 14px; padding: 12px; }
 
-.liftCardCompact {
-  padding: 10px;
-  border-radius: 12px;
-}
+.liftCardCompact { padding: 10px; border-radius: 12px; }
 
 .liftHead {
   display: flex;
@@ -670,9 +835,7 @@
   border-bottom: 1px solid var(--line);
 }
 
-.liftName {
-  font-weight: 900;
-}
+.liftName { font-weight: 900; }
 
 .pill {
   background: rgba(22, 163, 74, 0.15);
@@ -683,9 +846,7 @@
   white-space: nowrap;
 }
 
-.fitnessWrap.dark .pill {
-  color: #86efac;
-}
+.fitnessWrap.dark .pill { color: #86efac; }
 
 .liftMeta {
   display: flex;
@@ -722,11 +883,11 @@
   padding: 8px 10px;
   font-size: 12px;
   cursor: pointer;
+  transition: border-color var(--tFast) var(--ease);
 }
 
-.tabBtn:active {
-  transform: translateY(1px);
-}
+.tabBtn:hover { border-color: var(--strokeStrong); }
+.tabBtn:active { transform: translateY(1px); }
 
 .tabBtnActive {
   border-color: var(--accent);
@@ -748,21 +909,22 @@
 
   margin-top: 0;
   background: linear-gradient(180deg, var(--panel), var(--panel2));
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 @media (max-width: 640px) {
-  .exerciseBar {
-    top: var(--stickyTop);
-  }
+  .exerciseBar { top: var(--stickyTop); }
 }
 
 /* =========================================================
    TABLE / ROWS
    ========================================================= */
 
-.tableWrap {
-  margin-top: 14px;
-}
+.tableWrap { margin-top: 14px; }
 
 .tableHead {
   display: flex;
@@ -773,9 +935,7 @@
   margin-bottom: 8px;
 }
 
-.table {
-  overflow: hidden;
-}
+.table { overflow: hidden; }
 
 .tr {
   display: grid;
@@ -786,13 +946,8 @@
   border-top: 1px solid var(--line);
 }
 
-.tr:nth-child(even):not(.th) {
-  background: rgba(255, 255, 255, 0.45);
-}
-
-.fitnessWrap.dark .tr:nth-child(even):not(.th) {
-  background: rgba(255, 255, 255, 0.03);
-}
+.tr:nth-child(even):not(.th) { background: rgba(255, 255, 255, 0.45); }
+.fitnessWrap.dark .tr:nth-child(even):not(.th) { background: rgba(255, 255, 255, 0.03); }
 
 .th {
   border-top: none;
@@ -803,10 +958,7 @@
   text-transform: uppercase;
   letter-spacing: 0.02em;
 }
-
-.fitnessWrap.dark .th {
-  background: rgba(15, 23, 42, 0.55);
-}
+.fitnessWrap.dark .th { background: rgba(15, 23, 42, 0.55); }
 
 .notesCell {
   color: var(--muted);
@@ -816,19 +968,12 @@
 }
 
 @media (max-width: 900px) {
-  .tr {
-    grid-template-columns: 120px 1fr 80px 60px 110px 1fr 80px;
-  }
+  .tr { grid-template-columns: 120px 1fr 80px 60px 110px 1fr 80px; }
 }
 
 @media (max-width: 640px) {
-  .tr {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .notesCell {
-    white-space: normal;
-  }
+  .tr { grid-template-columns: 1fr 1fr; }
+  .notesCell { white-space: normal; }
 }
 
 /* =========================================================
@@ -841,4 +986,3 @@
   margin-top: 1.25rem;
   font-size: 0.9rem;
 }
-

@@ -1,0 +1,221 @@
+.tile {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  backdrop-filter: none;
+
+  /* Theme vars (fallbacks are your current light-mode look) */
+  --cal-border: rgba(0, 0, 0, 0.06);
+  --cal-border-strong: rgba(0, 0, 0, 0.12);
+  --cal-bg: rgba(255, 255, 255, 0.35);
+  --cal-bg-workout: rgba(0, 0, 0, 0.06);
+  --cal-today-ring: rgba(0, 0, 0, 0.25);
+
+  --cal-btn-bg: rgba(255, 255, 255, 0.45);
+  --cal-btn-bg-hover: rgba(255, 255, 255, 0.65);
+  --cal-btn-border: rgba(0, 0, 0, 0.10);
+}
+
+/* Dark mode when your Fitness page adds styles.dark (global "dark" on wrapper) */
+:global(.dark) .tile {
+  --cal-border: rgba(255, 255, 255, 0.10);
+  --cal-border-strong: rgba(255, 255, 255, 0.18);
+  --cal-bg: rgba(255, 255, 255, 0.06);
+  --cal-bg-workout: rgba(255, 255, 255, 0.10);
+  --cal-today-ring: rgba(255, 255, 255, 0.30);
+
+  --cal-btn-bg: rgba(255, 255, 255, 0.08);
+  --cal-btn-bg-hover: rgba(255, 255, 255, 0.12);
+  --cal-btn-border: rgba(255, 255, 255, 0.14);
+}
+
+.headerRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.title {
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.subTitle {
+  margin-top: 2px;
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+.miniStat {
+  text-align: right;
+}
+
+.miniStatNum {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.miniStatLabel {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.monthControls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.monthBtn {
+  border: 1px solid var(--cal-btn-border);
+  background: var(--cal-btn-bg);
+  border-radius: 10px;
+  padding: 4px 10px;
+  font-weight: 800;
+  cursor: pointer;
+  color: inherit;
+}
+
+.monthBtn:hover {
+  background: var(--cal-btn-bg-hover);
+}
+
+.weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  margin: 8px 0 6px;
+}
+
+.weekday {
+  text-align: center;
+  font-size: 12px;
+  opacity: 0.7;
+  font-weight: 700;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+/* Calendar day buttons */
+.cell {
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid var(--cal-border);
+  background: var(--cal-bg);
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  padding: 0;
+  color: inherit;
+  text-align: left;
+}
+
+.cell:hover {
+  filter: brightness(1.03);
+}
+
+.cellDim {
+  opacity: 0.35;
+}
+
+/* Day number */
+.dayNum {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.75;
+}
+
+/* Check mark for workout day */
+.check {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  font-size: 14px;
+  font-weight: 900;
+  opacity: 0.9;
+}
+
+/* ✅ Workout days: tint + strong inner ring */
+.cellWorkout {
+  background: var(--cal-bg-workout);
+  border-color: var(--cal-border-strong);
+  box-shadow: inset 0 0 0 3px rgba(0, 0, 0, 0.40);
+}
+
+:global(.dark) .cellWorkout {
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.55);
+}
+
+/* ✅ Today ring */
+.cellToday {
+  box-shadow: inset 0 0 0 2px var(--cal-today-ring);
+}
+
+/* ✅ Today + Workout: stacked rings */
+.cellToday.cellWorkout {
+  box-shadow:
+    inset 0 0 0 3px rgba(0, 0, 0, 0.40),
+    inset 0 0 0 5px var(--cal-today-ring);
+}
+
+:global(.dark) .cellToday.cellWorkout {
+  box-shadow:
+    inset 0 0 0 3px rgba(255, 255, 255, 0.55),
+    inset 0 0 0 5px var(--cal-today-ring);
+}
+
+/* ✅ Selected day: clear outline */
+.cellSelected {
+  outline: 2px solid rgba(0, 0, 0, 0.85);
+  outline-offset: 2px;
+}
+
+:global(.dark) .cellSelected {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+/* ✅ Legend matches workout indicator */
+.legendDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  display: inline-block;
+  background: var(--cal-bg-workout);
+  box-shadow: inset 0 0 0 3px rgba(0, 0, 0, 0.40);
+}
+
+:global(.dark) .legendDot {
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.55);
+}
+
+.legendToday {
+  margin-left: auto;
+  font-weight: 700;
+  opacity: 0.85;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
+}

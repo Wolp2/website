@@ -35,7 +35,9 @@ async function fitbitGet(accessToken, path) {
   const res = await fetch(`https://api.fitbit.com${path}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  if (!res.ok) throw new Error(`Fitbit API error ${res.status}: ${await res.text()}`);
+  if (!res.ok) {
+    throw new Error(`Fitbit API error ${res.status}: ${await res.text()}`);
+  }
   return res.json();
 }
 
@@ -50,9 +52,33 @@ function isISODate(s) {
   return typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
 }
 
+/** HRV Summary by Date */
+async function fetchHrvByDate(accessToken, dateISO) {
+  const r = await fetch(
+    `https://api.fitbit.com/1/user/-/hrv/date/${dateISO}.json`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+
+  if (!r.ok) {
+    // HRV can be unavailable; treat as optional
+    return { hrvDailyRmssd: null, hrvDeepRmssd: null };
+  }
+
+  const j = await r.json();
+  const first = Array.isArray(j?.hrv) ? j.hrv[0] : null;
+  const value = first?.value || null;
+
+  return {
+    hrvDailyRmssd: value?.dailyRmssd ?? null,
+    hrvDeepRmssd: value?.deepRmssd ?? null,
+  };
+}
+
 export async function onRequestGet({ env, request }) {
   const raw = await env.FITBIT_KV.get("fitbit_tokens");
-  if (!raw) return new Response("Not connected. Visit /fitbit/login", { status: 401 });
+  if (!raw) {
+    return new Response("Not connected. Visit /fitbit/login", { status: 401 });
+  }
 
   let tokens = JSON.parse(raw);
   tokens = await refreshIfNeeded(env, tokens);
@@ -62,10 +88,12 @@ export async function onRequestGet({ env, request }) {
   const qDate = url.searchParams.get("date");
   const day = isISODate(qDate) ? qDate : toISODateLocal(new Date());
 
-  const activity = await fitbitGet(tokens.access_token, `/1/user/-/activities/date/${day}.json`);
-  const hr = await fitbitGet(tokens.access_token, `/1/user/-/activities/heart/date/${day}/1d.json`);
+  const accessToken = tokens.access_token;
+
+  const activity = await fitbitGet(accessToken, `/1/user/-/activities/date/${day}.json`);
+  const hr = await fitbitGet(accessToken, `/1/user/-/activities/heart/date/${day}/1d.json`);
   const sleepList = await fitbitGet(
-    tokens.access_token,
+    accessToken,
     `/1.2/user/-/sleep/list.json?beforeDate=${day}&sort=desc&offset=0&limit=10`
   );
 
@@ -77,16 +105,26 @@ export async function onRequestGet({ env, request }) {
     const score = Number(rawScore);
     if (!Number.isFinite(score)) continue;
 
-
     if (sleepScore == null || score > sleepScore) sleepScore = score;
   }
 
+  // ✅ HRV (optional)
+  const hrv = await fetchHrvByDate(accessToken, day);
+
   return Response.json({
     date: day,
-    caloriesOut: activity?.summary?.caloriesOut,
-    steps: activity?.summary?.steps,
-    restingHeartRate: hr?.["activities-heart"]?.[0]?.value?.restingHeartRate,
-    heartRateZones: hr?.["activities-heart"]?.[0]?.value?.heartRateZones,
-    sleepScore,
+    caloriesOut: activity?.summary?.caloriesOut ?? null,
+    steps: activity?.summary?.steps ?? null,
+    restingHeartRate:
+      hr?.["activities-heart"]?.[0]?.value?.restingHeartRate ?? null,
+    heartRateZones:
+      hr?.["activities-heart"]?.[0]?.value?.heartRateZones ?? null,
+
+    // keep your existing key name (your frontend expects sleepQualityScore)
+    sleepQualityScore: sleepScore,
+
+    // ✅ NEW
+    hrvDailyRmssd: hrv.hrvDailyRmssd,
+    hrvDeepRmssd: hrv.hrvDeepRmssd,
   });
 }
